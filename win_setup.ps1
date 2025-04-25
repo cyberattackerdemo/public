@@ -27,48 +27,6 @@ try {
     Log "UACを無効化"
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value 0
 
-    # Office Deployment Tool ダウンロードと展開
-    $odtPath = "C:\ODT"
-    $odtExe = "C:\ODTSetup.exe"
-    Log "Office Deployment Toolをダウンロード"
-    Invoke-WebRequest -Uri "https://download.microsoft.com/download/0/1/B/01BE1D1F-AB7B-4A02-A4B8-3A64E4F64F8C/Officedeploymenttool.exe" -OutFile $odtExe
-    Log "ODTSetup.exeを展開"
-    Start-Process -FilePath $odtExe -ArgumentList "/quiet /extract:$odtPath" -Wait
-
-    # Word用構成ファイル作成
-    Log "Office構成ファイル作成"
-    $configXml = @"
-<Configuration>
-  <Add OfficeClientEdition="64" Channel="Current">
-    <Product ID="O365ProPlusRetail">
-      <Language ID="ja-jp" />
-      <ExcludeApp ID="Access" />
-      <ExcludeApp ID="Excel" />
-      <ExcludeApp ID="OneNote" />
-      <ExcludeApp ID="Outlook" />
-      <ExcludeApp ID="PowerPoint" />
-      <ExcludeApp ID="Publisher" />
-      <ExcludeApp ID="Teams" />
-    </Product>
-  </Add>
-  <Display Level="None" AcceptEULA="TRUE" />
-</Configuration>
-"@
-    Set-Content -Path "$odtPath\config.xml" -Value $configXml
-
-    # Wordをデスクトップに追加
-    $wordPath = "C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"
-    if (Test-Path $wordPath) {
-        Log "デスクトップにWordショートカット作成"
-        $desktop = [Environment]::GetFolderPath("Desktop")
-        $shortcutPath = Join-Path $desktop "Word.lnk"
-        $shell = New-Object -ComObject WScript.Shell
-        $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $wordPath
-        $shortcut.IconLocation = $wordPath
-        $shortcut.Save()
-    }
-
     # タイムゾーンを日本時間に設定
     Log "タイムゾーンをTokyoに設定"
     Set-TimeZone -Id "Tokyo Standard Time"
@@ -77,18 +35,15 @@ try {
     Log "NTP設定（ntp.nict.jp）"
     w32tm /config /manualpeerlist:"ntp.nict.jp" /syncfromflags:manual /update | Out-Null
     w32tm /resync | Out-Null
+    # Office Deployment Tool ダウンロードと展開
+    $odtPath = "C:\ODT"
+    $odtExe = "C:\ODTSetup.exe"
+    Log "Office Deployment Toolをダウンロード"
+    Invoke-WebRequest -Uri "https://download.microsoft.com/download/0/1/B/01BE1D1F-AB7B-4A02-A4B8-3A64E4F64F8C/Officedeploymenttool.exe" -OutFile $odtExe
+    Log "ODTSetup.exeを展開"
+    Start-Process -FilePath $odtExe -ArgumentList "/quiet /extract:$odtPath" -Wait
 
-    # Wordインストール
-    Log "Wordインストール開始"
-    Start-Process -FilePath "$odtPath\setup.exe" -ArgumentList "/configure $odtPath\config.xml" -Wait
-
-    # マクロ警告設定
-    Log "Wordマクロ警告レジストリ設定"
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word' -Force | Out-Null
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
-    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
-
-    # Chromeインストール
+        # Chromeインストール
     Log "Chromeをダウンロード＆インストール"
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\chrome_installer.exe'
     Start-Process -FilePath 'C:\chrome_installer.exe' -ArgumentList '/silent /install /log C:\chrome_install_log.txt' -Wait
@@ -147,6 +102,51 @@ try {
     Set-ItemProperty -Path $regPath -Name ProxyEnable -Value 1
     Set-ItemProperty -Path $regPath -Name ProxyServer -Value "10.0.1.254:3128"
     netsh winhttp set proxy 10.0.1.254:3128
+
+    # Word用構成ファイル作成
+    Log "Office構成ファイル作成"
+    $configXml = @"
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="ja-jp" />
+      <ExcludeApp ID="Access" />
+      <ExcludeApp ID="Excel" />
+      <ExcludeApp ID="OneNote" />
+      <ExcludeApp ID="Outlook" />
+      <ExcludeApp ID="PowerPoint" />
+      <ExcludeApp ID="Publisher" />
+      <ExcludeApp ID="Teams" />
+    </Product>
+  </Add>
+  <Display Level="None" AcceptEULA="TRUE" />
+</Configuration>
+"@
+    Set-Content -Path "$odtPath\config.xml" -Value $configXml
+
+    # Wordをデスクトップに追加
+    $wordPath = "C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"
+    if (Test-Path $wordPath) {
+        Log "デスクトップにWordショートカット作成"
+        $desktop = [Environment]::GetFolderPath("Desktop")
+        $shortcutPath = Join-Path $desktop "Word.lnk"
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $wordPath
+        $shortcut.IconLocation = $wordPath
+        $shortcut.Save()
+    }
+
+    # Wordインストール
+    Log "Wordインストール開始"
+    Start-Process -FilePath "$odtPath\setup.exe" -ArgumentList "/configure $odtPath\config.xml" -Wait
+
+    # マクロ警告設定
+    Log "Wordマクロ警告レジストリ設定"
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word' -Force | Out-Null
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
+
 
     Log "スクリプト実行完了"
 
