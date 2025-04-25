@@ -116,7 +116,7 @@ try {
 
 try {
     Log "Office構成ファイル作成"
-    $configXml = @"
+    $configXml = @'
 <Configuration>
   <Add OfficeClientEdition="64" Channel="Current">
     <Product ID="O365ProPlusRetail">
@@ -132,7 +132,7 @@ try {
   </Add>
   <Display Level="None" AcceptEULA="TRUE" />
 </Configuration>
-"@
+'@
     Set-Content -Path "$odtPath\config.xml" -Value $configXml
 } catch { LogError "Office構成ファイル作成失敗: $($_.Exception.Message)" }
 
