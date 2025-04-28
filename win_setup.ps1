@@ -45,7 +45,8 @@ try {
     Log "Office Deployment Toolをダウンロード"
     $odtPath = "C:\ODT"
     $odtExe = "C:\ODTSetup.exe"
-    Invoke-WebRequest -Uri "https://download.microsoft.com/download/0/1/B/01BE1D1F-AB7B-4A02-A4B8-3A64E4F64F8C/Officedeploymenttool.exe" -OutFile $odtExe
+    Invoke-WebRequest -Uri "Invoke-WebRequest -Uri "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18623-20156.exe" -OutFile $odtExe
+" -OutFile $odtExe
     Log "ODTSetup.exeを展開"
     Start-Process -FilePath $odtExe -ArgumentList "/quiet /extract:$odtPath" -Wait
 } catch { LogError "ODT取得または展開失敗: $($_.Exception.Message)" }
