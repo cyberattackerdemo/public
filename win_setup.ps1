@@ -63,7 +63,10 @@ try {
         Log "Chromeを既定ブラウザに設定"
         Start-Process $chromePath -ArgumentList '--make-default-browser' -Wait
     }
-} catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)"
+}
+
 
 try {
     Log "Chromeショートカット作成"
