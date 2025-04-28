@@ -47,8 +47,26 @@ try {
     $odtExe = "C:\ODTSetup.exe"
     Invoke-WebRequest -Uri "Invoke-WebRequest -Uri "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18623-20156.exe" -OutFile $odtExe
 " -OutFile $odtExe
+
+# 必ずフォルダ存在をチェック
+    if (!(Test-Path -Path $odtPath)) { New-Item -ItemType Directory -Path $odtPath -Force | Out-Null }
+
     Log "ODTSetup.exeを展開"
     Start-Process -FilePath $odtExe -ArgumentList "/quiet /extract:$odtPath" -Wait
+    
+# 展開が完了するのを待つ
+    $timeout = 60  # 最大60秒待つ
+    $elapsed = 0
+    while (!(Test-Path "$odtPath\setup.exe") -and ($elapsed -lt $timeout)) {
+      Start-Sleep -Seconds 1
+      $elapsed++
+    }
+
+    if (!(Test-Path "$odtPath\setup.exe")) {
+      throw "ODT setup.exe が見つかりません。展開に失敗しました。"
+    }
+
+
 } catch { LogError "ODT取得または展開失敗: $($_.Exception.Message)" }
 
 try {
