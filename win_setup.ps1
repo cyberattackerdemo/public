@@ -88,17 +88,20 @@ try {
 
 
 try {
-    Log "Chromeショートカット作成"
-    $chromeExePath = $chromePath
+    Log "Chromeショートカット作成（プロキシオプション付き）"
+    $chromeExePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
     $desktopPath = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktopPath "Google Chrome.lnk"
     if (Test-Path $chromeExePath) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $chromeExePath
+        $shortcut.Arguments = "--proxy-server=10.0.1.254:3128"
         $shortcut.IconLocation = $chromeExePath
         $shortcut.Save()
-        Log "Chromeをタスクバーにピン留め"
+        Log "Chromeショートカット作成完了（プロキシオプション付き）"
+
+        # タスクバーにピン留め（ファイルをコピー）
         $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
         Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
     }
