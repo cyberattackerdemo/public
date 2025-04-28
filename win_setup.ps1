@@ -83,7 +83,9 @@ try {
         $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
         Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
     }
-} catch { LogError "Chromeショートカット作成失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "Chromeショートカット作成失敗: $($_.Exception.Message)"
+}
 
 try {
     Log "ブックマークファイル作成"
