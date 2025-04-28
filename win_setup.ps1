@@ -135,6 +135,22 @@ try {
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
 try {
+    Log "プロキシ自動検出を無効化"
+    
+    # ユーザー設定（HKCU）
+    $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
+    
+    # ポリシー設定（HKLM）
+    $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
+    New-Item -Path $regPathMachine -Force | Out-Null
+    Set-ItemProperty -Path $regPathMachine -Name AutoDetect -Value 0 -Type DWord
+
+} catch {
+    LogError "プロキシ自動検出無効化失敗: $($_.Exception.Message)"
+}
+
+try {
     Log "プロキシ設定（HKCUとHKLM両方）"
 
     # ユーザー単位 (従来通り)
