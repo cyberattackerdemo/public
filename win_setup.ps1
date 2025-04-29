@@ -166,7 +166,7 @@ try {
 }
 
 try {
-    Log "ログオン後にHKCUへプロキシを適用するスクリプトを作成"
+    Log "ログオン後にHKCUプロキシ適用スクリプトを作成"
 
     $fixProxyScript = @'
 $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -176,27 +176,22 @@ Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
 Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0
 
 $taskName = "FixProxyHKCU"
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 '@
 
     $scriptPath = "C:\Users\Public\fix_proxy_hkcu.ps1"
     Set-Content -Path $scriptPath -Value $fixProxyScript -Force
 
-} catch {
-    LogError "fix_proxy_hkcu.ps1作成失敗: $($_.Exception.Message)"
-}
-
-try {
     Log "ログオン後にHKCUプロキシ適用タスクを登録"
 
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-ExecutionPolicy Bypass -File C:\Users\Public\fix_proxy_hkcu.ps1'
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -File `"$scriptPath`""
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\Interactive" -RunLevel Highest
-    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Principal $principal -Description "Apply proxy settings to HKCU after login" -Force
+    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Description "Apply proxy settings to HKCU after login" -Force
 
 } catch {
     LogError "HKCUプロキシ適用タスク登録失敗: $($_.Exception.Message)"
 }
+
 
 try {
     Log "Wordマクロ警告レジストリ設定"
