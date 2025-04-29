@@ -187,6 +187,18 @@ Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 }
 
 try {
+    Log "ログオン後にHKCUプロキシ適用タスクを登録"
+
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-ExecutionPolicy Bypass -File C:\Users\Public\fix_proxy_hkcu.ps1'
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\Interactive" -RunLevel Highest
+    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Principal $principal -Description "Apply proxy settings to HKCU after login" -Force
+
+} catch {
+    LogError "HKCUプロキシ適用タスク登録失敗: $($_.Exception.Message)"
+}
+
+try {
     Log "Wordマクロ警告レジストリ設定"
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word' -Force | Out-Null
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
