@@ -202,6 +202,27 @@ pause'
     LogError "HKCUプロキシ設定スクリプト作成失敗: $($_.Exception.Message)"
 }
 
+try {
+    Log "ログオン時に first_step_squid.bat を自動実行するタスク登録"
+
+    $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c C:\Users\Public\first_step_squid.bat"
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId "Interactive" -LogonType Interactive -RunLevel Limited
+
+    # 既存タスク削除（あれば）
+    if (Get-ScheduledTask -TaskName "FirstStepSquid" -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName "FirstStepSquid" -Confirm:$false
+    }
+
+    # タスク登録
+    Register-ScheduledTask -TaskName "FirstStepSquid" -Action $action -Trigger $trigger -Principal $principal
+
+    Log "タスク登録完了: ログイン時に first_step_squid.bat を実行"
+
+} catch {
+    LogError "ログオン自動実行タスク登録失敗: $($_.Exception.Message)"
+}
+
 # ===============================
 # Cleanup
 # ===============================
