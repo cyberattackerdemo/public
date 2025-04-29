@@ -184,14 +184,18 @@ Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Silent
 
     Log "ログオン後にHKCUプロキシ適用タスクを登録"
 
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -File `"$scriptPath`""
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$scriptPath`""
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Description "Apply proxy settings to HKCU after login" -Force
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+
+    # ここ重要！Principalを「Interactive User」として作成する
+    $principal = New-ScheduledTaskPrincipal -UserId "Interactive" -LogonType Interactive -RunLevel Limited
+
+    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Apply proxy settings to HKCU after login" -Force
 
 } catch {
     LogError "HKCUプロキシ適用タスク登録失敗: $($_.Exception.Message)"
 }
-
 
 try {
     Log "Wordマクロ警告レジストリ設定"
