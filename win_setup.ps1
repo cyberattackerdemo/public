@@ -207,7 +207,6 @@ try {
 
     $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c C:\Users\Public\first_step_squid.bat"
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $principal = New-ScheduledTaskPrincipal -UserId "Interactive" -LogonType Interactive -RunLevel Limited
 
     # 既存タスク削除（あれば）
     if (Get-ScheduledTask -TaskName "FirstStepSquid" -ErrorAction SilentlyContinue) {
