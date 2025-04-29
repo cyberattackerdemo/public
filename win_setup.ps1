@@ -136,6 +136,11 @@ try {
 try {
     Log "プロキシ設定（AutoDetect無効化＋HKCUとHKLM両方まとめて）"
 
+    # Internet Settingsキーが無ければ作成
+    if (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings")) {
+        New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Force
+    }
+    
     # ユーザー設定（HKCU）
     $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
