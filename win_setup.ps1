@@ -166,35 +166,36 @@ try {
 }
 
 try {
-    Log "ログオン後にHKCUプロキシ適用スクリプトを作成"
+    Log "ログインユーザーにHKCUプロキシを適用するタスクを登録"
 
-    $fixProxyScript = @'
-$regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    # タスクで実行するPowerShellコマンド
+    $psCommand = @"
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyEnable' -Value 1
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyServer' -Value '10.0.1.254:3128'
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'AutoDetect' -Value 0
+"@
 
-Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
-Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
-Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0
+    # コマンド保存用ファイル
+    $scriptPath = "C:\fix_proxy_hkcu.ps1"
+    Set-Content -Path $scriptPath -Value $psCommand -Force
 
-$taskName = "FixProxyHKCU"
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-'@
-
-    $scriptPath = "C:\Users\Public\fix_proxy_hkcu.ps1"
-    Set-Content -Path $scriptPath -Value $fixProxyScript -Force
-
-    Log "ログオン後にHKCUプロキシ適用タスクを登録"
-
+    # スケジュールタスク用設定
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$scriptPath`""
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-
-    # ここ重要！Principalを「Interactive User」として作成する
     $principal = New-ScheduledTaskPrincipal -UserId "Interactive" -LogonType Interactive -RunLevel Limited
 
-    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Apply proxy settings to HKCU after login" -Force
+    # 既存タスク削除（あれば）
+    if (Get-ScheduledTask -TaskName "FixProxyHKCU" -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName "FixProxyHKCU" -Confirm:$false
+    }
+
+    # タスク登録
+    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger -Principal $principal
+
+    Log "タスク登録完了: ログオン時にHKCUプロキシを自動適用"
 
 } catch {
-    LogError "HKCUプロキシ適用タスク登録失敗: $($_.Exception.Message)"
+    LogError "ログイン後プロキシ適用タスク登録失敗: $($_.Exception.Message)"
 }
 
 try {
