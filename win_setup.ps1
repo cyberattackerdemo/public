@@ -189,7 +189,7 @@ pause'
     Log "first_step_squid.bat 作成完了"
 
     # デスクトップにショートカット作成
-    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $desktopPath = "C:\Users\Public\Desktop"
     $shortcutPath = Join-Path $desktopPath "first_step_squid.lnk"
     $wshShell = New-Object -ComObject WScript.Shell
     $shortcut = $wshShell.CreateShortcut($shortcutPath)
