@@ -165,6 +165,26 @@ try {
     LogError "プロキシ設定（AutoDetect無効化＋Proxy指定）失敗: $($_.Exception.Message)"
 }
 
+try {
+    Log "ログオン後にHKCUへプロキシを適用するスクリプトを作成"
+
+    $fixProxyScript = @'
+$regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+
+Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
+Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
+Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0
+
+$taskName = "FixProxyHKCU"
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+'@
+
+    $scriptPath = "C:\Users\Public\fix_proxy_hkcu.ps1"
+    Set-Content -Path $scriptPath -Value $fixProxyScript -Force
+
+} catch {
+    LogError "fix_proxy_hkcu.ps1作成失敗: $($_.Exception.Message)"
+}
 
 try {
     Log "Wordマクロ警告レジストリ設定"
