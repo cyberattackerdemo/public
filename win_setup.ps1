@@ -168,29 +168,39 @@ try {
 } catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
 
 try {
-    Log "ログイン時にHKCUプロキシ再適用タスクを登録"
+    Log "HKCUプロキシ設定用スクリプト作成"
 
-    $psCommand = @"
+    # proxy_setup_hkcu.ps1 を作成
+    $proxyScriptPath = "C:\Users\Public\proxy_setup_hkcu.ps1"
+    $proxyScriptContent = @"
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyEnable' -Value 1
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyServer' -Value '10.0.1.254:3128'
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'AutoDetect' -Value 0
 "@
+    Set-Content -Path $proxyScriptPath -Value $proxyScriptContent -Force
+    Log "proxy_setup_hkcu.ps1 作成完了"
 
-    $scriptPath = "C:\fix_proxy_hkcu.ps1"
-    Set-Content -Path $scriptPath -Value $psCommand -Force
+    # first_step_squid.bat を作成
+    $batFilePath = "C:\Users\Public\first_step_squid.bat"
+    $batContent = '@echo off
+powershell.exe -ExecutionPolicy Bypass -File "C:\Users\Public\proxy_setup_hkcu.ps1"
+pause'
+    Set-Content -Path $batFilePath -Value $batContent -Force
+    Log "first_step_squid.bat 作成完了"
 
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$scriptPath`""
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    # デスクトップにショートカット作成
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = Join-Path $desktopPath "first_step_squid.lnk"
+    $wshShell = New-Object -ComObject WScript.Shell
+    $shortcut = $wshShell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $batFilePath
+    $shortcut.IconLocation = "%SystemRoot%\system32\shell32.dll,1"  # アイコン適当設定
+    $shortcut.Save()
+    Log "デスクトップに first_step_squid ショートカット作成完了"
 
-    if (Get-ScheduledTask -TaskName "FixProxyHKCU" -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName "FixProxyHKCU" -Confirm:$false
-    }
-
-    Register-ScheduledTask -TaskName "FixProxyHKCU" -Action $action -Trigger $trigger
-
-    Log "タスク登録完了"
-
-} catch { LogError "ログオン時プロキシ適用タスク登録失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "HKCUプロキシ設定スクリプト作成失敗: $($_.Exception.Message)"
+}
 
 # ===============================
 # Cleanup
