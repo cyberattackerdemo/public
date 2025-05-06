@@ -14,10 +14,7 @@ Start-Transcript -Path "C:\win_setup_transcript.txt" -Append
 
 Log "スクリプト実行開始"
 
-# ===============================
-# Windows基本設定
-# ===============================
-
+# 各処理ごとにtry-catchで囲むように変更
 try {
     Log "Defenderのリアルタイム保護を無効化"
     Set-MpPreference -DisableRealtimeMonitoring $true
@@ -43,10 +40,6 @@ try {
     w32tm /config /manualpeerlist:"ntp.nict.jp" /syncfromflags:manual /update | Out-Null
     w32tm /resync | Out-Null
 } catch { LogError "NTP設定失敗: $($_.Exception.Message)" }
-
-# ===============================
-# Wordインストール
-# ===============================
 
 try {
     Log "Wordインストール用ファイルをGitHubからダウンロード"
@@ -76,10 +69,6 @@ try {
     LogError "Wordインストール失敗: $($_.Exception.Message)"
 }
 
-# ===============================
-# Chromeインストールと設定
-# ===============================
-
 try {
     Log "Chromeをダウンロード＆インストール"
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\chrome_installer.exe'
@@ -93,26 +82,32 @@ try {
         Log "Chromeを既定ブラウザに設定"
         Start-Process $chromePath -ArgumentList '--make-default-browser' -Wait
     }
-} catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)"
+}
+
 
 try {
-    Log "Chromeショートカット作成（Public Desktopにプロキシ設定付き）"
-    $desktopPath = "$env:PUBLIC\Desktop"
+    Log "Chromeショートカット作成（プロキシオプション付き）"
+    $chromeExePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktopPath "Google Chrome.lnk"
-
-    if (Test-Path $chromePath) {
+    if (Test-Path $chromeExePath) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $chromePath
+        $shortcut.TargetPath = $chromeExePath
         $shortcut.Arguments = "--proxy-server=10.0.1.254:3128"
-        $shortcut.IconLocation = $chromePath
+        $shortcut.IconLocation = $chromeExePath
         $shortcut.Save()
-    }
-} catch { LogError "Chromeショートカット作成失敗: $($_.Exception.Message)" }
+        Log "Chromeショートカット作成完了（プロキシオプション付き）"
 
-# ===============================
-# その他設定
-# ===============================
+        # タスクバーにピン留め（ファイルをコピー）
+        $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
+        Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
+    }
+} catch {
+    LogError "Chromeショートカット作成失敗: $($_.Exception.Message)"
+}
 
 try {
     Log "ブックマークファイル作成"
@@ -138,23 +133,16 @@ try {
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
-# ===============================
-# Proxy設定とタスク登録
-# ===============================
-
 try {
-    Log "プロキシ設定（HKCU, HKLM, WinHTTP）＋グループポリシー更新"
+    Log "プロキシ設定（AutoDetect無効化＋HKCUとHKLM両方まとめて）"
 
-    # Internet Settings キー作成
-    if (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings")) {
-        New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Force
-    }
-
+    # ユーザー設定（HKCU）
     $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
     Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
     Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
 
+    # ポリシー設定（HKLM）
     $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
     New-Item -Path $regPathMachine -Force | Out-Null
     Set-ItemProperty -Path $regPathMachine -Name AutoDetect -Value 0 -Type DWord
@@ -162,74 +150,41 @@ try {
     Set-ItemProperty -Path $regPathMachine -Name ProxyEnable -Type DWord -Value 1
     Set-ItemProperty -Path $regPathMachine -Name ProxyServer -Value "10.0.1.254:3128"
 
+    # WinHTTPプロキシ設定
     netsh winhttp set proxy 10.0.1.254:3128
+
+    Log "グループポリシーを即時反映"
     gpupdate /force | Out-Null
 
-} catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
-
-try {
-    Log "HKCUプロキシ設定用スクリプト作成"
-
-    # proxy_setup_hkcu.ps1 を作成
-    $proxyScriptPath = "C:\Users\Public\proxy_setup_hkcu.ps1"
-    $proxyScriptContent = @"
-Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyEnable' -Value 1
-Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'ProxyServer' -Value '10.0.1.254:3128'
-Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name 'AutoDetect' -Value 0
-"@
-    Set-Content -Path $proxyScriptPath -Value $proxyScriptContent -Force
-    Log "proxy_setup_hkcu.ps1 作成完了"
-
-    # first_step_squid.bat を作成
-    $batFilePath = "C:\Users\Public\first_step_squid.bat"
-    $batContent = '@echo off
-powershell.exe -ExecutionPolicy Bypass -File "C:\Users\Public\proxy_setup_hkcu.ps1"
-pause'
-    Set-Content -Path $batFilePath -Value $batContent -Force
-    Log "first_step_squid.bat 作成完了"
-
-    # デスクトップにショートカット作成
-    $desktopPath = "C:\Users\Public\Desktop"
-    $shortcutPath = Join-Path $desktopPath "first_step_squid.lnk"
-    $wshShell = New-Object -ComObject WScript.Shell
-    $shortcut = $wshShell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $batFilePath
-    $shortcut.IconLocation = "%SystemRoot%\system32\shell32.dll,1"  # アイコン適当設定
-    $shortcut.Save()
-    Log "デスクトップに first_step_squid ショートカット作成完了"
-
 } catch {
-    LogError "HKCUプロキシ設定スクリプト作成失敗: $($_.Exception.Message)"
+    LogError "プロキシ設定（AutoDetect無効化＋Proxy指定）失敗: $($_.Exception.Message)"
 }
 
-try {
-    Log "ログオン時に first_step_squid.bat を自動実行するタスク登録"
-
-    $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c C:\Users\Public\first_step_squid.bat"
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-
-    # 既存タスク削除（あれば）
-    if (Get-ScheduledTask -TaskName "FirstStepSquid" -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName "FirstStepSquid" -Confirm:$false
-    }
-
-    # タスク登録
-    Register-ScheduledTask -TaskName "FirstStepSquid" -Action $action -Trigger $trigger -Principal $principal
-
-    Log "タスク登録完了: ログイン時に first_step_squid.bat を実行"
-
-} catch {
-    LogError "ログオン自動実行タスク登録失敗: $($_.Exception.Message)"
+# no_proxyの対象IPリストを作成（10.0.1.101〜10.0.1.199）
+$noProxyList = @()
+for ($i = 101; $i -le 199; $i++) {
+    $noProxyList += "10.0.1.$i"
 }
+$noProxyValue = $noProxyList -join ","
 
-# ===============================
-# Cleanup
-# ===============================
+# 環境変数に設定（Machineスコープ）
+[System.Environment]::SetEnvironmentVariable("no_proxy", $noProxyValue, "Machine")
+[System.Environment]::SetEnvironmentVariable("NO_PROXY", $noProxyValue, "Machine")
+
+
+try {
+    Log "Wordマクロ警告レジストリ設定"
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word' -Force | Out-Null
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
+} catch { LogError "Wordレジストリ設定失敗: $($_.Exception.Message)" }
 
 try {
     Log "一時フォルダ (C:\ODT) を削除"
     Remove-Item -Path "C:\ODT" -Recurse -Force
-} catch { LogError "一時フォルダ削除失敗: $($_.Exception.Message)" }
+} catch {
+    LogError "一時フォルダ削除失敗: $($_.Exception.Message)"
+}
 
 Log "スクリプト完了"
 Stop-Transcript
