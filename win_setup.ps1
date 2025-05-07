@@ -151,12 +151,25 @@ try {
     gpupdate /force | Out-Null
 } catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
 
-# Wordのマクロ警告設定（ポリシーで許可）
+# 信頼されていないマクロも有効化（警告なし）
 try {
-    Log "Wordマクロ警告レジストリ設定"
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
-    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
-} catch { LogError "Wordレジストリ設定失敗: $($_.Exception.Message)" }
+    Log "信頼されていないマクロも有効化（警告なし）"
+
+    # Word のポリシーレベルのマクロセキュリティ設定（HKLM）
+    $macroSecurityPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security'
+
+    # パスが存在しない場合は作成
+    if (!(Test-Path $macroSecurityPath)) {
+        New-Item -Path $macroSecurityPath -Force | Out-Null
+    }
+
+    # VBAWarnings = 1 に設定 → 警告なしですべてのマクロを有効化（非常に危険）
+    Set-ItemProperty -Path $macroSecurityPath -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
+
+    Log "マクロセキュリティ設定（VBAWarnings=1）完了"
+} catch {
+    LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
+}
 
 # インストール時に作成した一時フォルダを削除
 try {
