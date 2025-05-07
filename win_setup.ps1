@@ -1,74 +1,71 @@
 ﻿$logFile = "C:\win_config_log.txt"
 
+# ログ出力関数（通常）
 function Log($message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path $logFile -Value "$timestamp [INFO] $message"
 }
 
+# ログ出力関数（エラー）
 function LogError($message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path $logFile -Value "$timestamp [ERROR] $message"
 }
 
+# 実行のトランスクリプトを開始
 Start-Transcript -Path "C:\win_setup_transcript.txt" -Append
 
 Log "スクリプト実行開始"
 
-# 各処理ごとにtry-catchで囲むように変更
+# Defender無効化
 try {
     Log "Defenderのリアルタイム保護を無効化"
     Set-MpPreference -DisableRealtimeMonitoring $true
 } catch { LogError "Defenderの無効化失敗: $($_.Exception.Message)" }
 
+# ファイアウォール無効化
 try {
     Log "ファイアウォールを無効化"
     netsh advfirewall set allprofiles state off
 } catch { LogError "ファイアウォール無効化失敗: $($_.Exception.Message)" }
 
+# UAC無効化
 try {
     Log "UACを無効化"
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value 0
 } catch { LogError "UAC無効化失敗: $($_.Exception.Message)" }
 
+# タイムゾーン設定
 try {
     Log "タイムゾーンをTokyoに設定"
     Set-TimeZone -Id "Tokyo Standard Time"
 } catch { LogError "タイムゾーン設定失敗: $($_.Exception.Message)" }
 
+# NTP設定
 try {
-    Log "NTP設定"
+    Log "NTPサーバー設定と同期"
     w32tm /config /manualpeerlist:"ntp.nict.jp" /syncfromflags:manual /update | Out-Null
     w32tm /resync | Out-Null
 } catch { LogError "NTP設定失敗: $($_.Exception.Message)" }
 
+# Wordインストーラーと設定ファイルをGitHubからダウンロードして実行
 try {
     Log "Wordインストール用ファイルをGitHubからダウンロード"
-
     $tempPath = "C:\ODT"
     if (!(Test-Path -Path $tempPath)) {
         New-Item -ItemType Directory -Path $tempPath | Out-Null
-        Log "一時フォルダ作成: $tempPath"
     }
-
-    $setupUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/setup.exe"
-    $configUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/config.xml"
-
-    Invoke-WebRequest -Uri $setupUrl -OutFile "$tempPath\setup.exe"
-    Invoke-WebRequest -Uri $configUrl -OutFile "$tempPath\config.xml"
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cyberattackerdemo/public/main/setup.exe" -OutFile "$tempPath\setup.exe"
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cyberattackerdemo/public/main/config.xml" -OutFile "$tempPath\config.xml"
 
     if (!(Test-Path "$tempPath\setup.exe") -or !(Test-Path "$tempPath\config.xml")) {
-        throw "必要なファイルが揃っていません。ダウンロードに失敗しました。"
+        throw "必要なファイルが揃っていません。"
     }
 
-    Log "Wordインストール開始"
     Start-Process -FilePath "$tempPath\setup.exe" -ArgumentList "/configure $tempPath\config.xml" -Wait
+} catch { LogError "Wordインストール失敗: $($_.Exception.Message)" }
 
-    Log "Wordインストール完了"
-
-} catch {
-    LogError "Wordインストール失敗: $($_.Exception.Message)"
-}
-
+# Chromeインストールと既定設定
 try {
     Log "Chromeをダウンロード＆インストール"
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\chrome_installer.exe'
@@ -76,39 +73,33 @@ try {
     Remove-Item 'C:\chrome_installer.exe'
 } catch { LogError "Chromeインストール失敗: $($_.Exception.Message)" }
 
+# Chromeを既定ブラウザに
 try {
     $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
     if (Test-Path $chromePath) {
-        Log "Chromeを既定ブラウザに設定"
         Start-Process $chromePath -ArgumentList '--make-default-browser' -Wait
     }
-} catch {
-    LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)"
-}
+} catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
 
-
+# Chromeショートカット（プロキシ設定付き）作成とタスクバーへピン留め
 try {
     Log "Chromeショートカット作成（プロキシオプション付き）"
-    $chromeExePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
     $desktopPath = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktopPath "Google Chrome.lnk"
-    if (Test-Path $chromeExePath) {
+    if (Test-Path $chromePath) {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $chromeExePath
+        $shortcut.TargetPath = $chromePath
         $shortcut.Arguments = "--proxy-server=10.0.1.254:3128"
-        $shortcut.IconLocation = $chromeExePath
+        $shortcut.IconLocation = $chromePath
         $shortcut.Save()
-        Log "Chromeショートカット作成完了（プロキシオプション付き）"
 
-        # タスクバーにピン留め（ファイルをコピー）
         $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
         Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
     }
-} catch {
-    LogError "Chromeショートカット作成失敗: $($_.Exception.Message)"
-}
+} catch { LogError "Chromeショートカット作成失敗: $($_.Exception.Message)" }
 
+# ブックマークファイル作成
 try {
     Log "ブックマークファイル作成"
     $bookmarkPath = "$env:PUBLIC\Bookmarks"
@@ -116,6 +107,7 @@ try {
     Set-Content -Path "$bookmarkPath\bookmarks.txt" -Value "https://gmail.com`r`nhttps://dp-handson-jp4.cybereason.net"
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
+# 日本語言語パックとIMEの追加
 try {
     Log "日本語言語パックとIMEをインストール"
     Add-WindowsCapability -Online -Name Language.Basic~~~ja-JP~0.0.1.0
@@ -124,6 +116,7 @@ try {
     Add-WindowsCapability -Online -Name Language.TextToSpeech~~~ja-JP~0.0.1.0
 } catch { LogError "日本語言語パックインストール失敗: $($_.Exception.Message)" }
 
+# 日本語環境設定
 try {
     Log "言語設定を日本語に変更"
     Set-WinUILanguageOverride -Language ja-JP
@@ -133,16 +126,14 @@ try {
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
+# プロキシ設定（WinINET, ポリシー, WinHTTP）＋no_proxy変数登録
 try {
-    Log "プロキシ設定（AutoDetect無効化＋HKCUとHKLM両方まとめて）"
-
-    # ユーザー設定（HKCU）
+    Log "プロキシ設定（WinINET/HKLM/WinHTTP）＋no_proxy環境変数"
     $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
     Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
     Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
 
-    # ポリシー設定（HKLM）
     $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
     New-Item -Path $regPathMachine -Force | Out-Null
     Set-ItemProperty -Path $regPathMachine -Name AutoDetect -Value 0 -Type DWord
@@ -150,41 +141,28 @@ try {
     Set-ItemProperty -Path $regPathMachine -Name ProxyEnable -Type DWord -Value 1
     Set-ItemProperty -Path $regPathMachine -Name ProxyServer -Value "10.0.1.254:3128"
 
-    # WinHTTPプロキシ設定
     netsh winhttp set proxy 10.0.1.254:3128
 
-    Log "グループポリシーを即時反映"
+    $noProxyList = @(101..199 | ForEach-Object { "10.0.1.$_" })
+    $noProxyValue = $noProxyList -join ","
+    [System.Environment]::SetEnvironmentVariable("no_proxy", $noProxyValue, "Machine")
+    [System.Environment]::SetEnvironmentVariable("NO_PROXY", $noProxyValue, "Machine")
+
     gpupdate /force | Out-Null
+} catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
 
-} catch {
-    LogError "プロキシ設定（AutoDetect無効化＋Proxy指定）失敗: $($_.Exception.Message)"
-}
-
-# no_proxyの対象IPリストを作成（10.0.1.101〜10.0.1.199）
-$noProxyList = @()
-for ($i = 101; $i -le 199; $i++) {
-    $noProxyList += "10.0.1.$i"
-}
-$noProxyValue = $noProxyList -join ","
-
-# 環境変数に設定（Machineスコープ）
-[System.Environment]::SetEnvironmentVariable("no_proxy", $noProxyValue, "Machine")
-[System.Environment]::SetEnvironmentVariable("NO_PROXY", $noProxyValue, "Machine")
-
-
+# Wordのマクロ警告設定（ポリシーで許可）
 try {
     Log "Wordマクロ警告レジストリ設定"
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word' -Force | Out-Null
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Force | Out-Null
     New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security' -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
 } catch { LogError "Wordレジストリ設定失敗: $($_.Exception.Message)" }
 
+# インストール時に作成した一時フォルダを削除
 try {
     Log "一時フォルダ (C:\ODT) を削除"
     Remove-Item -Path "C:\ODT" -Recurse -Force
-} catch {
-    LogError "一時フォルダ削除失敗: $($_.Exception.Message)"
-}
+} catch { LogError "一時フォルダ削除失敗: $($_.Exception.Message)" }
 
 Log "スクリプト完了"
 Stop-Transcript
