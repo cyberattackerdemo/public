@@ -48,7 +48,7 @@ try {
     w32tm /resync | Out-Null
 } catch { LogError "NTP設定失敗: $($_.Exception.Message)" }
 
-# Wordインストーラーと設定ファイルをGitHubからダウンロードして実行
+# Wordインストール用ファイルをダウンロードして実行
 try {
     Log "Wordインストール用ファイルをGitHubからダウンロード"
     $tempPath = "C:\ODT"
@@ -65,7 +65,17 @@ try {
     Start-Process -FilePath "$tempPath\setup.exe" -ArgumentList "/configure $tempPath\config.xml" -Wait
 } catch { LogError "Wordインストール失敗: $($_.Exception.Message)" }
 
-# Chromeインストールと既定設定
+# ダウンロードファイルのブロック解除（MOTW対策）
+try {
+    Log "ダウンロードファイルのブロック解除（MOTW対策）"
+    Unblock-File -Path "C:\Users\Public\Documents\*.zip"
+    Expand-Archive -Path "C:\Users\Public\Documents\your.zip" -DestinationPath "C:\Users\Public\Documents\unzipped"
+    Unblock-File -Path "C:\Users\Public\Documents\unzipped\*.docm"
+} catch {
+    LogError "ファイルのブロック解除失敗: $($_.Exception.Message)"
+}
+
+# Chromeインストール
 try {
     Log "Chromeをダウンロード＆インストール"
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\chrome_installer.exe'
@@ -81,7 +91,7 @@ try {
     }
 } catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
 
-# Chromeショートカット（プロキシ設定付き）作成とタスクバーへピン留め
+# Chromeショートカット作成とタスクバーへピン留め（プロキシ指定付き）
 try {
     Log "Chromeショートカット作成（プロキシオプション付き）"
     $desktopPath = [Environment]::GetFolderPath("Desktop")
@@ -90,7 +100,7 @@ try {
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $chromePath
-        $shortcut.Arguments = "--proxy-server=10.0.1.254:3128"
+        $shortcut.Arguments = "--proxy-server=10.0.1.254:3128 --proxy-bypass-list=10.0.1.*"
         $shortcut.IconLocation = $chromePath
         $shortcut.Save()
 
@@ -99,7 +109,7 @@ try {
     }
 } catch { LogError "Chromeショートカット作成失敗: $($_.Exception.Message)" }
 
-# ブックマークファイル作成
+# ブックマーク作成
 try {
     Log "ブックマークファイル作成"
     $bookmarkPath = "$env:PUBLIC\Bookmarks"
@@ -107,7 +117,7 @@ try {
     Set-Content -Path "$bookmarkPath\bookmarks.txt" -Value "https://gmail.com`r`nhttps://dp-handson-jp4.cybereason.net"
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
-# 日本語言語パックとIMEの追加
+# 日本語言語パックの追加
 try {
     Log "日本語言語パックとIMEをインストール"
     Add-WindowsCapability -Online -Name Language.Basic~~~ja-JP~0.0.1.0
@@ -116,7 +126,26 @@ try {
     Add-WindowsCapability -Online -Name Language.TextToSpeech~~~ja-JP~0.0.1.0
 } catch { LogError "日本語言語パックインストール失敗: $($_.Exception.Message)" }
 
-# 日本語環境設定
+# 一般ユーザーの作成
+try {
+    Log "一般ユーザー victim を作成"
+
+    $userName = "victim"
+    $password = "victim" | ConvertTo-SecureString -AsPlainText -Force
+
+    # 既に存在しないか確認してから作成
+    if (!(Get-LocalUser -Name $userName -ErrorAction SilentlyContinue)) {
+        New-LocalUser -Name $userName -Password $password -FullName "Victim User" -Description "Standard User"
+        Add-LocalGroupMember -Group "Users" -Member $userName
+        Log "ユーザー victim を作成し、Users グループに追加完了"
+    } else {
+        Log "ユーザー victim は既に存在しています"
+    }
+} catch {
+    LogError "一般ユーザー作成失敗: $($_.Exception.Message)"
+}
+
+# 日本語に設定
 try {
     Log "言語設定を日本語に変更"
     Set-WinUILanguageOverride -Language ja-JP
@@ -126,52 +155,48 @@ try {
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
-# プロキシ設定（WinINET, ポリシー, WinHTTP）＋no_proxy変数登録
+# プロキシ設定とno_proxy環境変数に10.0.1.0/24を含める
 try {
-    Log "プロキシ設定（WinINET/HKLM/WinHTTP）＋no_proxy環境変数"
+    Log "WinINET＋WinHTTP＋HKLMプロキシ＋no_proxy設定"
+
+    # WinINET (HKCU)
     $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-    Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0 -Type DWord
+    Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0
     Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
     Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
 
+    # WinINET (HKLMポリシー)
     $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
-    New-Item -Path $regPathMachine -Force | Out-Null
-    Set-ItemProperty -Path $regPathMachine -Name AutoDetect -Value 0 -Type DWord
-    Set-ItemProperty -Path $regPathMachine -Name ProxySettingsPerUser -Type DWord -Value 0
-    Set-ItemProperty -Path $regPathMachine -Name ProxyEnable -Type DWord -Value 1
-    Set-ItemProperty -Path $regPathMachine -Name ProxyServer -Value "10.0.1.254:3128"
+    if (!(Test-Path $regPathMachine)) { New-Item -Path $regPathMachine -Force | Out-Null }
+    New-ItemProperty -Path $regPathMachine -Name ProxyEnable -PropertyType DWord -Value 1 -Force | Out-Null
+    New-ItemProperty -Path $regPathMachine -Name ProxyServer -PropertyType String -Value "10.0.1.254:3128" -Force | Out-Null
+    New-ItemProperty -Path $regPathMachine -Name ProxyOverride -PropertyType String -Value "10.0.1.*" -Force | Out-Null
 
-    netsh winhttp set proxy 10.0.1.254:3128
+    # WinHTTP
+    netsh winhttp set proxy 10.0.1.254:3128 "10.0.1.*"
 
-    $noProxyList = @(101..199 | ForEach-Object { "10.0.1.$_" })
-    $noProxyValue = $noProxyList -join ","
-    [System.Environment]::SetEnvironmentVariable("no_proxy", $noProxyValue, "Machine")
-    [System.Environment]::SetEnvironmentVariable("NO_PROXY", $noProxyValue, "Machine")
+    # 環境変数 no_proxy
+    [System.Environment]::SetEnvironmentVariable("no_proxy", "10.0.1.*", "Machine")
+    [System.Environment]::SetEnvironmentVariable("NO_PROXY", "10.0.1.*", "Machine")
 
     gpupdate /force | Out-Null
 } catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
 
-# 信頼されていないマクロも有効化（警告なし）
+# マクロ削除回避のための信頼センター設定とマクロセキュリティ緩和
 try {
     Log "信頼されていないマクロも有効化（警告なし）"
-
-    # Word のポリシーレベルのマクロセキュリティ設定（HKLM）
     $macroSecurityPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security'
-
-    # パスが存在しない場合は作成
     if (!(Test-Path $macroSecurityPath)) {
         New-Item -Path $macroSecurityPath -Force | Out-Null
     }
-
-    # VBAWarnings = 1 に設定 → 警告なしですべてのマクロを有効化（非常に危険）
     Set-ItemProperty -Path $macroSecurityPath -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
-
-    Log "マクロセキュリティ設定（VBAWarnings=1）完了"
+    Set-ItemProperty -Path $macroSecurityPath -Name 'blockcontentexecutionfrominternet' -PropertyType DWord -Value 0 -Force
+    Log "マクロセキュリティ設定完了 (VBAWarnings=1, blockcontentexecutionfrominternet=0)"
 } catch {
     LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
 }
 
-# インストール時に作成した一時フォルダを削除
+# 一時フォルダ削除
 try {
     Log "一時フォルダ (C:\ODT) を削除"
     Remove-Item -Path "C:\ODT" -Recurse -Force
