@@ -231,7 +231,7 @@ try {
     $ps1Content | Set-Content -Path $downloadScriptPath -Encoding UTF8
 
     # 実行用BATのパス（全ユーザーデスクトップ）
-    $batPath = "$env:PUBLIC\Desktop\Run_GitHubDownloader.bat"
+    $batPath = "$env:PUBLIC\Desktop\Download_5files.bat"
     $batContent = "@echo off`r`n" +
                   "powershell -ExecutionPolicy Bypass -File `"$downloadScriptPath`"`r`n" +
                   "pause"
@@ -242,7 +242,7 @@ try {
     # 既定プロファイルにもコピー（初回ログイン時にユーザーのデスクトップに反映される）
     $defaultDesktop = "C:\Users\Default\Desktop"
     if (Test-Path $defaultDesktop) {
-        Copy-Item -Path $batPath -Destination "$defaultDesktop\Run_GitHubDownloader.bat" -Force
+        Copy-Item -Path $batPath -Destination "$defaultDesktop\Download_5files.bat" -Force
     }
 
     Log "ダウンロード用PS1とBATファイル作成完了"
