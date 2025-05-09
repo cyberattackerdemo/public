@@ -117,6 +117,72 @@ try {
     Set-Content -Path "$bookmarkPath\bookmarks.txt" -Value "https://gmail.com`r`nhttps://dp-handson-jp4.cybereason.net"
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
+# GitHubファイルダウンロード用のPS1とBATファイルを作成・配置・実行設定
+try {
+    Log "GitHubファイルダウンロード用PS1とBATを作成・タスク登録"
+
+    $ps1Path = "C:\Users\Public\GitHubFileDownloader.ps1"
+    $batPath = "C:\Users\Public\Desktop\github_downloader.bat"
+
+    # ダウンロード対象URLリスト
+    $downloadUrls = @(
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx",
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx",
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
+    )
+
+    # PS1コンテンツの組み立て
+    $ps1Content = @"
+\$desktopPath = [Environment]::GetFolderPath("Desktop")
+\$urls = @(
+    "$($downloadUrls[0])",
+    "$($downloadUrls[1])",
+    "$($downloadUrls[2])",
+    "$($downloadUrls[3])",
+    "$($downloadUrls[4])"
+)
+
+foreach (\$url in \$urls) {
+    \$fileName = Split-Path \$url -Leaf
+    \$targetPath = Join-Path \$desktopPath \$fileName
+    if (-Not (Test-Path \$targetPath)) {
+        Invoke-WebRequest -Uri \$url -OutFile \$targetPath -ErrorAction SilentlyContinue
+    }
+}
+
+\$allExist = \$true
+foreach (\$url in \$urls) {
+    \$fileName = Split-Path \$url -Leaf
+    if (-Not (Test-Path (Join-Path \$desktopPath \$fileName))) {
+        \$allExist = \$false
+        break
+    }
+}
+
+if (\$allExist) {
+    Remove-Item -Path "$ps1Path" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$batPath" -Force -ErrorAction SilentlyContinue
+}
+"@
+
+    # PS1ファイル保存
+    Set-Content -Path $ps1Path -Value $ps1Content -Force
+
+    # BATファイル作成（PowerShellスクリプト実行用）
+    $batContent = "powershell -ExecutionPolicy Bypass -File `"$ps1Path`""
+    Set-Content -Path $batPath -Value $batContent -Force
+
+    # タスクスケジューラ登録（初回ログオン時に管理者で実行）
+    schtasks /Create /TN "RunGitHubDownloader" `
+        /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
+
+    Log "GitHubファイルダウンロード用のスクリプトとタスクを正常に設定しました。"
+} catch {
+    LogError "GitHubファイルダウンロード関連処理失敗: $($_.Exception.Message)"
+}
+
 # 日本語言語パックの追加
 try {
     Log "日本語言語パックとIMEをインストール"
@@ -195,77 +261,6 @@ try {
 } catch {
     LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
 }
-
-try {
-    Log "GitHubファイルダウンロード用PS1と起動用BATファイルを作成"
-
-    # GitHubからファイルをダウンロードするスクリプトファイルの保存パス
-    $ps1Path = "C:\Users\Public\GitHubFileDownloader.ps1"
-
-    # GitHubファイルURLと保存ファイル名のペア
-    $fileMap = @{
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt" = "password.txt"
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt" = "Customerlist.txt"
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx" = "document1.docx"
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx" = "document2.docx"
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx" = "document3.docx"
-    }
-
-   # スクリプトでデスクトップにダウンロードする処理を定義
-$ps1Content = @"
-\$desktopPath = [Environment]::GetFolderPath("Desktop")
-\$urls = @(
-    "${($downloadUrls[0])}",
-    "${($downloadUrls[1])}",
-    "${($downloadUrls[2])}",
-    "${($downloadUrls[3])}",
-    "${($downloadUrls[4])}"
-)
-
-foreach (\$url in \$urls) {
-    \$fileName = Split-Path \$url -Leaf
-    \$targetPath = Join-Path \$desktopPath \$fileName
-    if (-Not (Test-Path \$targetPath)) {
-        Invoke-WebRequest -Uri \$url -OutFile \$targetPath -ErrorAction SilentlyContinue
-    }
-}
-
-# 全ファイルが存在する場合は .ps1 と .bat を削除
-\$allExist = \$true
-foreach (\$url in \$urls) {
-    \$fileName = Split-Path \$url -Leaf
-    if (-Not (Test-Path (Join-Path \$desktopPath \$fileName))) {
-        \$allExist = \$false
-        break
-    }
-}
-
-if (\$allExist) {
-    Remove-Item -Path "$ps1Path" -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "C:\Users\Public\Desktop\github_downloader.bat" -Force -ErrorAction SilentlyContinue
-}
-"@
-
-# .ps1ファイルを書き出す
-Set-Content -Path $ps1Path -Value $ps1Content -Force
-
-# バッチファイルのパス（Public Desktopに配置）
-$batPath = "C:\Users\Public\Desktop\github_downloader.bat"
-
-# .batファイルの内容（PowerShellスクリプトを管理者権限で実行）
-$batContent = "powershell -ExecutionPolicy Bypass -File `"$ps1Path`""
-Set-Content -Path $batPath -Value $batContent -Force
-
-# タスクスケジューラに登録（ONLOGONで1回のみ、HIGHEST権限で）
-try {
-    schtasks /Create /TN "RunGitHubDownloader" `
-        /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
-} catch {
-    Write-Output "タスクスケジューラ登録失敗: $_"
-}
-
-# ログ出力
-Write-Output "GitHubファイルダウンロード用のスクリプトとタスク登録が完了しました。"
 
 # 一時フォルダ削除
 try {
