@@ -196,6 +196,61 @@ try {
     LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
 }
 
+try {
+    Log "GitHubファイルダウンロード用PS1と起動用BATファイルを作成"
+
+    # 保存先ディレクトリの作成
+    $ps1Dir = "C:\Users\Public\GitHubFiles"
+    if (!(Test-Path $ps1Dir)) {
+        New-Item -Path $ps1Dir -ItemType Directory | Out-Null
+    }
+
+    # GitHubファイルURLと保存ファイル名のペア
+    $fileMap = @{
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt" = "password.txt"
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt" = "Customerlist.txt"
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx" = "document1.docx"
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx" = "document2.docx"
+        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx" = "document3.docx"
+    }
+
+    # ダウンロード用PS1のパス
+    $downloadScriptPath = "$ps1Dir\DownloadFromGitHub.ps1"
+
+    # PS1内容を構成
+    $ps1Content = @()
+    $ps1Content += 'Write-Host "GitHubファイルのダウンロードを開始します..."'
+    foreach ($url in $fileMap.Keys) {
+        $filename = $fileMap[$url]
+        $destPath = Join-Path $ps1Dir $filename
+        $ps1Content += "Invoke-WebRequest -Uri `"$url`" -OutFile `"$destPath`" -UseBasicParsing"
+    }
+    $ps1Content += 'Write-Host "完了しました。"'
+
+    # PS1ファイル保存
+    $ps1Content | Set-Content -Path $downloadScriptPath -Encoding UTF8
+
+    # 実行用BATのパス（全ユーザーデスクトップ）
+    $batPath = "$env:PUBLIC\Desktop\Run_GitHubDownloader.bat"
+    $batContent = "@echo off`r`n" +
+                  "powershell -ExecutionPolicy Bypass -File `"$downloadScriptPath`"`r`n" +
+                  "pause"
+
+    # BATファイル保存
+    $batContent | Set-Content -Path $batPath -Encoding ASCII
+
+    # 既定プロファイルにもコピー（初回ログイン時にユーザーのデスクトップに反映される）
+    $defaultDesktop = "C:\Users\Default\Desktop"
+    if (Test-Path $defaultDesktop) {
+        Copy-Item -Path $batPath -Destination "$defaultDesktop\Run_GitHubDownloader.bat" -Force
+    }
+
+    Log "ダウンロード用PS1とBATファイル作成完了"
+
+} catch {
+    LogError "GitHubダウンロード用スクリプト作成失敗: $($_.Exception.Message)"
+}
+
 # 一時フォルダ削除
 try {
     Log "一時フォルダ (C:\ODT) を削除"
