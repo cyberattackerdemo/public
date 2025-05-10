@@ -108,6 +108,23 @@ try {
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
 try {
+    # ログ出力ファイルのパス
+    $logFile = "C:\Users\Public\github_download_log.txt"
+
+    # 通常ログ出力関数
+    function Log($msg) {
+        $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $line = "$ts`t$msg"
+        Add-Content -Path $logFile -Value $line
+    }
+
+    # エラーログ出力関数
+    function LogError($msg) {
+        $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $line = "$ts`t[ERROR] $msg"
+        Add-Content -Path $logFile -Value $line
+    }
+
     Log "GitHubファイルダウンロード用PS1とBATを作成・タスク登録（Public Desktop対応）"
 
     $ps1Path = "C:\Users\Public\GitHubFileDownloader.ps1"
@@ -115,25 +132,23 @@ try {
     $logPath = "C:\Users\Public\github_download_log.txt"
     $desktopPath = "C:\Users\Public\Desktop"
 
-    $downloadUrls = @(
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx",
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx",
-        "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
-    )
+    $ps1Content = @'
+`$logFile = '$logPath'
 
-    $ps1Content = @"
-$logFile = "C:\Users\Public\github_download_log.txt"
-function Log($msg) {
-    $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $logFile -Value "$ts`t$msg"
+function Log(`$msg) {
+    `$ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path `$logFile -Value "`$ts`t`$msg"
+}
+
+function LogError(`$msg) {
+    `$ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path `$logFile -Value "`$ts`t[ERROR] `$msg"
 }
 
 Log "GitHubファイルダウンロード開始"
 
-$desktopPath = "C:\Users\Public\Desktop"
-$urls = @(
+`$desktopPath = "$desktopPath"
+`$urls = @(
     "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
     "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
     "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx",
@@ -141,45 +156,46 @@ $urls = @(
     "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
 )
 
-foreach ($url in $urls) {
-    $fileName = Split-Path $url -Leaf
-    $targetPath = Join-Path $desktopPath $fileName
-    if (-Not (Test-Path $targetPath)) {
+foreach (`$url in `$urls) {
+    `$fileName = Split-Path `$url -Leaf
+    `$targetPath = Join-Path `$desktopPath `$fileName
+    if (-Not (Test-Path `$targetPath)) {
         try {
-            Invoke-WebRequest -Uri $url -OutFile $targetPath -ErrorAction Stop
-            Log "Downloaded: $fileName"
+            Invoke-WebRequest -Uri `$url -OutFile `$targetPath -ErrorAction Stop
+            Log "Downloaded: `$fileName"
         } catch {
-            Log "Failed to download: $fileName - $($_.Exception.Message)"
+            LogError "Failed to download: `$fileName - `$($_.Exception.Message)"
         }
     } else {
-        Log "Already exists: $fileName"
+        Log "Already exists: `$fileName"
     }
 }
 
-$allExist = $true
-foreach ($url in $urls) {
-    $fileName = Split-Path $url -Leaf
-    if (-Not (Test-Path (Join-Path $desktopPath $fileName))) {
-        $allExist = $false
+`$allExist = `$true
+foreach (`$url in `$urls) {
+    `$fileName = Split-Path `$url -Leaf
+    if (-Not (Test-Path (Join-Path `$desktopPath `$fileName))) {
+        `$allExist = `$false
         break
     }
 }
 
-if ($allExist) {
+if (`$allExist) {
     Log "全ファイルダウンロード成功。自動削除を実行"
-    Remove-Item -Path "C:\Users\Public\GitHubFileDownloader.ps1" -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "C:\Users\Public\Desktop\github_downloader.bat" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path '$ps1Path' -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path '$batPath' -Force -ErrorAction SilentlyContinue
     schtasks /Delete /TN "RunGitHubDownloader" /F | Out-Null
 }
-"@
+'@
 
-    # 保存
+    # PS1ファイル保存
     Set-Content -Path $ps1Path -Value $ps1Content -Force
 
+    # BATファイル作成（PowerShellスクリプト実行用）
     $batContent = "powershell -ExecutionPolicy Bypass -File `"$ps1Path`""
     Set-Content -Path $batPath -Value $batContent -Force
 
-    # タスク登録
+    # タスクスケジューラ登録（初回ログオン時に管理者で実行）
     schtasks /Create /TN "RunGitHubDownloader" `
         /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
 
