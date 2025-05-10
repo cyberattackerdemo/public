@@ -65,16 +65,6 @@ try {
     Start-Process -FilePath "$tempPath\setup.exe" -ArgumentList "/configure $tempPath\config.xml" -Wait
 } catch { LogError "Wordインストール失敗: $($_.Exception.Message)" }
 
-# ダウンロードファイルのブロック解除（MOTW対策）
-try {
-    Log "ダウンロードファイルのブロック解除（MOTW対策）"
-    Unblock-File -Path "C:\Users\Public\Documents\*.zip"
-    Expand-Archive -Path "C:\Users\Public\Documents\your.zip" -DestinationPath "C:\Users\Public\Documents\unzipped"
-    Unblock-File -Path "C:\Users\Public\Documents\unzipped\*.docm"
-} catch {
-    LogError "ファイルのブロック解除失敗: $($_.Exception.Message)"
-}
-
 # Chromeインストール
 try {
     Log "Chromeをダウンロード＆インストール"
@@ -117,14 +107,14 @@ try {
     Set-Content -Path "$bookmarkPath\bookmarks.txt" -Value "https://gmail.com`r`nhttps://dp-handson-jp4.cybereason.net"
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
-# GitHubファイルダウンロード用のPS1とBATファイルを作成・配置・実行設定
 try {
-    Log "GitHubファイルダウンロード用PS1とBATを作成・タスク登録"
+    Log "GitHubファイルダウンロード用PS1とBATを作成・タスク登録（Public Desktop対応）"
 
     $ps1Path = "C:\Users\Public\GitHubFileDownloader.ps1"
     $batPath = "C:\Users\Public\Desktop\github_downloader.bat"
+    $logPath = "C:\Users\Public\github_download_log.txt"
+    $desktopPath = "C:\Users\Public\Desktop"
 
-    # ダウンロード対象URLリスト
     $downloadUrls = @(
         "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
         "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
@@ -133,9 +123,16 @@ try {
         "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
     )
 
-    # PS1コンテンツの組み立て
     $ps1Content = @"
-\$desktopPath = [Environment]::GetFolderPath("Desktop")
+\$logFile = '$logPath'
+function Log(\$msg) {
+    \$ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path \$logFile -Value "\$ts `t \$msg"
+}
+
+Log "GitHubファイルダウンロード開始"
+
+\$desktopPath = "$desktopPath"
 \$urls = @(
     "$($downloadUrls[0])",
     "$($downloadUrls[1])",
@@ -148,7 +145,14 @@ foreach (\$url in \$urls) {
     \$fileName = Split-Path \$url -Leaf
     \$targetPath = Join-Path \$desktopPath \$fileName
     if (-Not (Test-Path \$targetPath)) {
-        Invoke-WebRequest -Uri \$url -OutFile \$targetPath -ErrorAction SilentlyContinue
+        try {
+            Invoke-WebRequest -Uri \$url -OutFile \$targetPath -ErrorAction Stop
+            Log "Downloaded: \$fileName"
+        } catch {
+            Log "Failed to download: \$fileName - \$($_.Exception.Message)"
+        }
+    } else {
+        Log "Already exists: \$fileName"
     }
 }
 
@@ -162,23 +166,24 @@ foreach (\$url in \$urls) {
 }
 
 if (\$allExist) {
+    Log "全ファイルダウンロード成功。自動削除を実行"
     Remove-Item -Path "$ps1Path" -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "$batPath" -Force -ErrorAction SilentlyContinue
+    schtasks /Delete /TN "RunGitHubDownloader" /F | Out-Null
 }
 "@
 
-    # PS1ファイル保存
+    # 保存
     Set-Content -Path $ps1Path -Value $ps1Content -Force
 
-    # BATファイル作成（PowerShellスクリプト実行用）
     $batContent = "powershell -ExecutionPolicy Bypass -File `"$ps1Path`""
     Set-Content -Path $batPath -Value $batContent -Force
 
-    # タスクスケジューラ登録（初回ログオン時に管理者で実行）
+    # タスク登録
     schtasks /Create /TN "RunGitHubDownloader" `
         /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
 
-    Log "GitHubファイルダウンロード用のスクリプトとタスクを正常に設定しました。"
+    Log "GitHubファイルダウンロードスクリプトとタスク登録を完了"
 } catch {
     LogError "GitHubファイルダウンロード関連処理失敗: $($_.Exception.Message)"
 }
@@ -255,8 +260,8 @@ try {
     if (!(Test-Path $macroSecurityPath)) {
         New-Item -Path $macroSecurityPath -Force | Out-Null
     }
-    Set-ItemProperty -Path $macroSecurityPath -Name 'VBAWarnings' -PropertyType DWord -Value 1 -Force
-    Set-ItemProperty -Path $macroSecurityPath -Name 'blockcontentexecutionfrominternet' -PropertyType DWord -Value 0 -Force
+    Set-ItemProperty -Path $macroSecurityPath -Name 'VBAWarnings' -Value 1 -Force
+    Set-ItemProperty -Path $macroSecurityPath -Name 'blockcontentexecutionfrominternet' -Value 0 -Force
     Log "マクロセキュリティ設定完了 (VBAWarnings=1, blockcontentexecutionfrominternet=0)"
 } catch {
     LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
