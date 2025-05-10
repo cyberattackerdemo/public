@@ -156,6 +156,8 @@ $urls = @(
     "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
 )
 
+Log "DEBUG: desktopPath=[$desktopPath] fileName=[$fileName]"
+
 foreach ($url in $urls) {
     $fileName = Split-Path $url -Leaf
     $targetPath = Join-Path $desktopPath $fileName
