@@ -226,6 +226,7 @@ try {
     if (!(Get-LocalUser -Name $userName -ErrorAction SilentlyContinue)) {
         New-LocalUser -Name $userName -Password $password -FullName "Victim User" -Description "Standard User"
         Add-LocalGroupMember -Group "Users" -Member $userName
+        Add-LocalGroupMember -Group "Remote Desktop Users" -Member $userName
         Log "ユーザー victim を作成し、Users グループに追加完了"
     } else {
         Log "ユーザー victim は既に存在しています"
