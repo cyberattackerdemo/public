@@ -216,24 +216,24 @@ try {
 } catch { LogError "日本語言語パックインストール失敗: $($_.Exception.Message)" }
 
 # 一般ユーザーの作成
-try {
-    Log "一般ユーザー victim を作成"
+#try {
+    #Log "一般ユーザー victim を作成"
 
-    $userName = "victim"
-    $password = "victim" | ConvertTo-SecureString -AsPlainText -Force
+    #$userName = "victim"
+    #$password = "victim" | ConvertTo-SecureString -AsPlainText -Force
 
     # 既に存在しないか確認してから作成
-    if (!(Get-LocalUser -Name $userName -ErrorAction SilentlyContinue)) {
-        New-LocalUser -Name $userName -Password $password -FullName "Victim User" -Description "Standard User"
-        Add-LocalGroupMember -Group "Users" -Member $userName
-        Add-LocalGroupMember -Group "Remote Desktop Users" -Member $userName
-        Log "ユーザー victim を作成し、Users グループに追加完了"
-    } else {
-        Log "ユーザー victim は既に存在しています"
-    }
-} catch {
-    LogError "一般ユーザー作成失敗: $($_.Exception.Message)"
-}
+    #if (!(Get-LocalUser -Name $userName -ErrorAction SilentlyContinue)) {
+        #New-LocalUser -Name $userName -Password $password -FullName "Victim User" -Description "Standard User"
+        #Add-LocalGroupMember -Group "Users" -Member $userName
+        #Add-LocalGroupMember -Group "Remote Desktop Users" -Member $userName
+        #Log "ユーザー victim を作成し、Users グループに追加完了"
+    #} else {
+        #Log "ユーザー victim は既に存在しています"
+    #}
+#} catch {
+    #LogError "一般ユーザー作成失敗: $($_.Exception.Message)"
+#}
 
 # 日本語に設定
 try {
