@@ -87,4 +87,19 @@ Run-Step "Setting system environment variables for proxy" {
     [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://10.0.1.5:8080", "Machine")
 }
 
+Run-Step "Removing Microsoft Identity Verification Root CA 2020 if present" {
+    $certSubject = "CN=Microsoft Identity Verification Root Certificate Authority 2020, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+    $storePath = "Cert:\LocalMachine\Root"
+    $store = Get-Item $storePath
+    $cert = Get-ChildItem $store.PSPath | Where-Object { $_.Subject -eq $certSubject }
+
+    if ($cert) {
+        Write-Log "Found certificate with Thumbprint: $($cert.Thumbprint). Attempting to remove..."
+        Remove-Item -Path "$storePath\$($cert.Thumbprint)" -Force
+        Write-Log "Certificate removed successfully."
+    } else {
+        Write-Log "Certificate not found. Nothing to remove."
+    }
+}
+
 Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
