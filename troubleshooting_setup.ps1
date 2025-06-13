@@ -1,4 +1,4 @@
-$logPath = "C:\Windows\Temp\setup_log.txt"
+$logPath = "C:\Users\Public\setup_log.txt"
 function Write-Log {
     param (
         [string]$message,
