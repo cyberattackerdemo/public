@@ -1,4 +1,6 @@
 $logPath = "C:\Users\Public\setup_log.txt"
+
+# === ログ出力関数 ===
 function Write-Log {
     param (
         [string]$message,
@@ -10,19 +12,33 @@ function Write-Log {
     Add-Content -Path $logPath -Value $entry
 }
 
+# === ステップ実行関数 ===
 function Run-Step {
     param (
         [string]$stepName,
         [scriptblock]$action
     )
-    Write-Log "$stepName..."
+    Write-Log "=== $stepName ==="
     $start = Get-Date
     try {
-        & $action
+        $output = & $action *>&1
+        $exitCode = $LASTEXITCODE
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
-        Write-Log "$stepName completed in $duration seconds."
-    } catch {
+
+        if ($exitCode -eq 0 -or $null -eq $exitCode) {
+            Write-Log "$stepName completed in $duration seconds."
+        } else {
+            Write-Log "$stepName completed with exit code $exitCode in $duration seconds." "WARNING"
+        }
+
+        if ($output) {
+            Write-Log "Output:`n$output"
+        } else {
+            Write-Log "No output."
+        }
+    }
+    catch {
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
         Write-Log "Failed: $stepName - $_ (after $duration seconds)" "ERROR"
@@ -30,10 +46,18 @@ function Run-Step {
 }
 
 # ==============================
-Run-Step "Installing Google Chrome" {
+# スクリプト本体
+# ==============================
+
+Write-Log "===== Setup started ====="
+
+Run-Step "Downloading Google Chrome installer" {
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/375.126/chrome_installer.exe' -OutFile 'C:\Windows\Temp\ChromeSetup.exe'
+}
+
+Run-Step "Installing Google Chrome" {
     Start-Process -FilePath 'C:\Windows\Temp\ChromeSetup.exe' -ArgumentList '/silent /install' -Wait
-    Remove-Item 'C:\Windows\Temp\ChromeSetup.exe'
+    Remove-Item 'C:\Windows\Temp\ChromeSetup.exe' -ErrorAction SilentlyContinue
 }
 
 Run-Step "Installing Japanese language pack" {
@@ -87,4 +111,4 @@ Run-Step "Setting system environment variables for proxy" {
     [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://10.0.1.10:8080", "Machine")
 }
 
-Write-Log "Setup completed. Please restart the system to apply the Japanese UI and IME settings."
+Write-Log "===== Setup completed. Please restart the system to apply the Japanese UI and IME settings. ====="
