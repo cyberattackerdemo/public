@@ -31,6 +31,12 @@ log "Restarting dnsmasq..."
 sudo systemctl restart dnsmasq
 sudo systemctl status dnsmasq | grep Active | tee -a $LOG_FILE
 
+# Add Allow 10.0.1.0/24 to tinyproxy.conf if not present
+if ! grep -q "Allow 10.0.1.0/24" /etc/tinyproxy/tinyproxy.conf; then
+    echo "Allow 10.0.1.0/24" | sudo tee -a /etc/tinyproxy/tinyproxy.conf
+fi
+sudo systemctl restart tinyproxy
+
 # Restart tinyproxy
 log "Restarting tinyproxy..."
 sudo systemctl restart tinyproxy
