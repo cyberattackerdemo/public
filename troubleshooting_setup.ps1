@@ -1,6 +1,5 @@
 $logPath = "C:\Users\Public\setup_log.txt"
 
-# === ログ出力関数 ===
 function Write-Log {
     param (
         [string]$message,
@@ -12,7 +11,6 @@ function Write-Log {
     Add-Content -Path $logPath -Value $entry
 }
 
-# === ステップ実行関数 ===
 function Run-Step {
     param (
         [string]$stepName,
@@ -21,45 +19,44 @@ function Run-Step {
     Write-Log "=== $stepName ==="
     $start = Get-Date
     try {
-        $output = & $action *>&1
-        $exitCode = $LASTEXITCODE
+        $output = & $action 2>&1
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
-
-        if ($exitCode -eq 0 -or $null -eq $exitCode) {
-            Write-Log "$stepName completed in $duration seconds."
-        } else {
-            Write-Log "$stepName completed with exit code $exitCode in $duration seconds." "WARNING"
-        }
-
+        Write-Log "$stepName completed in $duration seconds."
         if ($output) {
             Write-Log "Output:`n$output"
         } else {
             Write-Log "No output."
         }
-    }
-    catch {
+    } catch {
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
         Write-Log "Failed: $stepName - $_ (after $duration seconds)" "ERROR"
     }
 }
 
-# ==============================
-# スクリプト本体
-# ==============================
-
 Write-Log "===== Setup started ====="
 
-Run-Step "Downloading Google Chrome installer" {
+# ========== Install Google Chrome ==========
+Run-Step "Downloading and Installing Google Chrome" {
     Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/375.126/chrome_installer.exe' -OutFile 'C:\Windows\Temp\ChromeSetup.exe'
-}
-
-Run-Step "Installing Google Chrome" {
     Start-Process -FilePath 'C:\Windows\Temp\ChromeSetup.exe' -ArgumentList '/silent /install' -Wait
-    Remove-Item 'C:\Windows\Temp\ChromeSetup.exe' -ErrorAction SilentlyContinue
+    Remove-Item 'C:\Windows\Temp\ChromeSetup.exe'
 }
 
+# ========== Install Wireshark ==========
+Run-Step "Installing Wireshark" {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+    $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
+    $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
+
+    Start-BitsTransfer -Source $url -Destination $installerPath
+    Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
+    Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
+}
+
+# ========== Install Japanese Language Pack ==========
 Run-Step "Installing Japanese language pack" {
     Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0"
     Add-WindowsCapability -Online -Name "Language.Handwriting~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
@@ -68,36 +65,17 @@ Run-Step "Installing Japanese language pack" {
     Add-WindowsCapability -Online -Name "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0"
 }
 
-Run-Step "Configuring system locale to Japanese" {
-    Set-WinUILanguageOverride -Language ja-JP
-    Set-WinUserLanguageList ja-JP -Force
-    Set-WinSystemLocale ja-JP
-    Set-Culture ja-JP
-    Set-WinHomeLocation -GeoId 122
-}
-
+# ========== Set Time Zone ==========
 Run-Step "Setting time zone to Tokyo" {
     Set-TimeZone -Id 'Tokyo Standard Time'
 }
 
-Run-Step "Configuring internet proxy" {
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d 'http://10.0.1.10:8080' /f
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
-}
-
-Run-Step "Disabling DNS-over-HTTPS in Chrome" {
-    $regPath = "HKLM:\SOFTWARE\Policies\Google\Chrome"
-    if (-not (Test-Path $regPath)) {
-        New-Item -Path $regPath -Force | Out-Null
-    }
-    New-ItemProperty -Path $regPath -Name "DnsOverHttpsMode" -PropertyType String -Value "off" -Force | Out-Null
-}
-
+# ========== Pause Windows Update for 14 days ==========
 Run-Step "Pausing Windows Update for 14 days" {
     $pauseDays = 14
     $currentDate = Get-Date
     $pauseUntil = $currentDate.AddDays($pauseDays).ToString("yyyy-MM-dd")
+
     $regPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
     if (-not (Test-Path $regPath)) {
         New-Item -Path $regPath -Force | Out-Null
@@ -106,9 +84,48 @@ Run-Step "Pausing Windows Update for 14 days" {
     Set-ItemProperty -Path $regPath -Name "PauseQualityUpdatesUntil" -Value $pauseUntil
 }
 
-Run-Step "Setting system environment variables for proxy" {
-    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "https://10.0.1.10:8080", "Machine")
-    [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://10.0.1.10:8080", "Machine")
+# ========== Set System Locale to Japanese ==========
+Run-Step "Configuring system locale to Japanese" {
+    $langPack = Get-WindowsCapability -Online | Where-Object { $_.Name -like "Language.Basic~~~ja-JP~*" }
+
+    if ($langPack.State -ne "Installed") {
+        Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0" -ErrorAction Stop
+    }
+
+    $LangList = New-WinUserLanguageList ja-JP
+    if ($LangList -and $LangList.Count -gt 0) {
+        $LangList[0].Handwriting = $true
+        Set-WinUserLanguageList $LangList -Force
+    }
+
+    Set-WinUILanguageOverride -Language ja-JP
+    Set-WinSystemLocale ja-JP
+    Set-Culture ja-JP
+    Set-WinHomeLocation -GeoId 122
 }
 
+# ========== Disable DNS-over-HTTPS in Chrome ==========
+Run-Step "Disabling DNS-over-HTTPS in Chrome" {
+    $regPath = "HKLM:\SOFTWARE\Policies\Google\Chrome"
+    if (-not (Test-Path $regPath)) {
+        New-Item -Path $regPath -Force | Out-Null
+    }
+    New-ItemProperty -Path $regPath -Name "DnsOverHttpsMode" -PropertyType String -Value "off" -Force | Out-Null
+}
+
+# ========== Configure Proxy ==========
+Run-Step "Configuring internet proxy and WinHTTP proxy" {
+    $proxyAddress = "10.0.1.6:8080"
+
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "http://$proxyAddress" /f
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
+
+    netsh winhttp set proxy proxy-server="http://$proxyAddress"
+
+    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "https://$proxyAddress", "Machine")
+    [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://$proxyAddress", "Machine")
+}
+
+# ========== Final Message ==========
 Write-Log "===== Setup completed. Please restart the system to apply the Japanese UI and IME settings. ====="
