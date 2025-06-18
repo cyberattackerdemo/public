@@ -40,4 +40,7 @@ sudo systemctl status tinyproxy | grep Active | tee -a $LOG_FILE
 log "Converting scripts to LF format..."
 dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
 
+# ホスト名と127.0.1.1を紐づけ
+sudo sed -i "/^127.0.1.1/ d" /etc/hosts && echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
+
 log "Setup complete."
