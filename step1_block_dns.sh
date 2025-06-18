@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "address=/example.com/0.0.0.0" | sudo tee /etc/dnsmasq.d/block-example.conf
+echo "address=/cybereason.net/0.0.0.0" | sudo tee /etc/dnsmasq.d/block-cybereason.conf
 
 echo "Restarting dnsmasq..."
 sudo systemctl restart dnsmasq
