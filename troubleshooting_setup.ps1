@@ -45,16 +45,16 @@ Run-Step "Downloading and Installing Google Chrome" {
 }
 
 # ========== Install Wireshark ==========
-Run-Step "Installing Wireshark" {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# Run-Step "Installing Wireshark" {
+   # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-    $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
-    $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
+   # $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
+   # $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
 
-    Start-BitsTransfer -Source $url -Destination $installerPath
-    Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
-    Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
-}
+   # Start-BitsTransfer -Source $url -Destination $installerPath
+   # Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
+   # Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
+# }
 
 # ========== Install Japanese Language Pack ==========
 Run-Step "Installing Japanese language pack" {
