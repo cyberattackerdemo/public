@@ -31,11 +31,23 @@ log "Restarting dnsmasq..."
 sudo systemctl restart dnsmasq
 sudo systemctl status dnsmasq | grep Active | tee -a $LOG_FILE
 
-# Add Allow 10.0.1.0/24 to tinyproxy.conf if not present
+# Fix tinyproxy.conf: set Port 8080
+log "Configuring tinyproxy to use port 8080..."
+sudo sed -i 's/^Port .*/Port 8080/' /etc/tinyproxy/tinyproxy.conf
+grep -i '^Port' /etc/tinyproxy/tinyproxy.conf | tee -a $LOG_FILE
+
+# Ensure Allow 10.0.1.0/24 is present
 if ! grep -q "Allow 10.0.1.0/24" /etc/tinyproxy/tinyproxy.conf; then
     echo "Allow 10.0.1.0/24" | sudo tee -a /etc/tinyproxy/tinyproxy.conf
+    log "Added Allow 10.0.1.0/24 to tinyproxy.conf"
+else
+    log "Allow 10.0.1.0/24 already present"
 fi
-sudo systemctl restart tinyproxy
+
+# Create /var/log/tinyproxy
+log "Ensuring /var/log/tinyproxy exists..."
+sudo mkdir -p /var/log/tinyproxy
+sudo chown tinyproxy:tinyproxy /var/log/tinyproxy
 
 # Restart tinyproxy
 log "Restarting tinyproxy..."
@@ -47,6 +59,7 @@ log "Converting scripts to LF format..."
 dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
 
 # ホスト名と127.0.1.1を紐づけ
+log "Fixing /etc/hosts entry for hostname..."
 sudo sed -i "/^127.0.1.1/ d" /etc/hosts && echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
 
 log "Setup complete."
