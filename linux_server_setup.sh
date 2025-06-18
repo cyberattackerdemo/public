@@ -11,7 +11,7 @@ log "Starting setup..."
 # Install packages
 log "Installing required packages..."
 sudo apt-get update | tee -a $LOG_FILE
-sudo apt-get install -y dnsmasq tinyproxy mitmproxy dos2unix | tee -a $LOG_FILE
+sudo apt-get install -y dnsmasq tinyproxy mitmproxy dos2unix net-tools | tee -a $LOG_FILE
 
 # Disable systemd-resolved to free port 53
 log "Disabling systemd-resolved..."
