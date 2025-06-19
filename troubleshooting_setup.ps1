@@ -113,6 +113,13 @@ Run-Step "Disabling DNS-over-HTTPS in Chrome" {
     New-ItemProperty -Path $regPath -Name "DnsOverHttpsMode" -PropertyType String -Value "off" -Force | Out-Null
 }
 
+# ========== DNS connection setting ==========
+Run-Step "Forcing DNS server to 10.0.1.6" {
+    Get-DnsClient | Where-Object {$_.InterfaceAlias -like "Ethernet*"} | ForEach-Object {
+        Set-DnsClientServerAddress -InterfaceAlias $_.InterfaceAlias -ServerAddresses 10.0.1.6
+    }
+}
+
 # ========== Configure Proxy ==========
 Run-Step "Configuring internet proxy and WinHTTP proxy" {
     $proxyAddress = "10.0.1.6:8080"
