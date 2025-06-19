@@ -1,17 +1,42 @@
 #!/bin/bash
 
-# log file
 LOG_FILE=/home/troubleshoot/linux_server_setup.log
 
-# 出力開始
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh =====" | tee $LOG_FILE
 
-# 必要なパッケージをインストール
+# 必要なパッケージ
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Installing required packages..." | tee -a $LOG_FILE
 apt-get update >> $LOG_FILE 2>&1
-apt-get install -y build-essential libssl-dev libgnutls28-dev nettle-dev pkg-config perl g++ wget libdb-dev >> $LOG_FILE 2>&1
+apt-get install -y build-essential libssl-dev libgnutls28-dev nettle-dev pkg-config perl g++ wget libdb-dev dnsmasq >> $LOG_FILE 2>&1
 
-# Squid ダウンロードとビルド
+# ----- DNS Forwarding 環境セットアップ -----
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Configuring DNS forwarding..." | tee -a $LOG_FILE
+
+# resolved.conf 更新
+sed -i 's/#DNS=/DNS=8.8.8.8/g' /etc/systemd/resolved.conf
+sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
+
+# resolv.conf 更新
+ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+# systemd-resolved restart
+systemctl restart systemd-resolved
+
+# dnsmasq 設定ファイル作成
+cat << EOF > /etc/dnsmasq.conf
+server=8.8.8.8
+server=8.8.4.4
+listen-address=127.0.0.1,10.0.1.6
+EOF
+
+# dnsmasq 再起動
+systemctl restart dnsmasq
+
+# DNS 状態確認
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening DNS ports:" | tee -a $LOG_FILE
+ss -lnup | grep 53 | tee -a $LOG_FILE
+
+# ----- Squid Proxy ビルド -----
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Downloading Squid 6.10..." | tee -a $LOG_FILE
 cd /tmp
 wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz >> $LOG_FILE 2>&1
