@@ -29,8 +29,9 @@ server=8.8.4.4
 listen-address=127.0.0.1,10.0.1.6
 EOF
 
-# dnsmasq 再起動
+# dnsmasq 再起動 & enable
 systemctl restart dnsmasq
+systemctl enable dnsmasq
 
 # DNS 状態確認
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening DNS ports:" | tee -a $LOG_FILE
@@ -87,16 +88,34 @@ http_access deny all
 access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
-# squid 起動
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting Squid proxy..." | tee -a ../$LOG_FILE
-/usr/local/squid/sbin/squid -z >> ../$LOG_FILE 2>&1
-/usr/local/squid/sbin/squid >> ../$LOG_FILE 2>&1
+# ----- Squid systemd service 作成 -----
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating squid.service ..." | tee -a ../$LOG_FILE
 
-# 確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid process status:" | tee -a ../$LOG_FILE
-ps aux | grep squid | grep -v grep | tee -a ../$LOG_FILE
+cat << EOF > /etc/systemd/system/squid.service
+[Unit]
+Description=Squid Web Proxy
+After=network.target
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening ports:" | tee -a ../$LOG_FILE
-ss -lnpt | grep 8080 | tee -a ../$LOG_FILE
+[Service]
+Type=forking
+ExecStart=/usr/local/squid/sbin/squid -s
+ExecReload=/usr/local/squid/sbin/squid -k reconfigure
+ExecStop=/usr/local/squid/sbin/squid -k shutdown
+PIDFile=/usr/local/squid/var/run/squid.pid
+LimitNOFILE=65536
 
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# systemctl reload & enable & start squid
+systemctl daemon-reload
+systemctl enable squid
+systemctl start squid
+
+# Squid 状態確認
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid status:" | tee -a ../$LOG_FILE
+systemctl status squid --no-pager | tee -a ../$LOG_FILE
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a ../$LOG_FILE
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a ../$LOG_FILE
