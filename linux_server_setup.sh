@@ -11,7 +11,7 @@ log "Starting setup..."
 # Install packages
 log "Installing required packages..."
 sudo apt-get update | tee -a $LOG_FILE
-sudo apt-get install -y dnsmasq squid openssl net-tools dos2unix | tee -a $LOG_FILE
+sudo apt-get install -y dnsmasq squid-openssl dos2unix net-tools openssl | tee -a $LOG_FILE
 
 # Disable systemd-resolved to free port 53
 log "Disabling systemd-resolved..."
@@ -29,56 +29,45 @@ echo "log-facility=/var/log/dnsmasq.log" | sudo tee -a /etc/dnsmasq.d/logging.co
 # Restart dnsmasq
 log "Restarting dnsmasq..."
 sudo systemctl restart dnsmasq
-sudo systemctl status dnsmasq --no-pager | tee -a $LOG_FILE
+sudo systemctl status dnsmasq | grep Active | tee -a $LOG_FILE
 
 # Generate Squid SSL CA cert
 log "Generating Squid SSL CA cert..."
 sudo mkdir -p /etc/squid/ssl_cert
-sudo openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+sudo openssl req -new -newkey rsa:4096 -sha256 -days 3650 -nodes -x509 \
+    -subj "/C=JP/ST=Tokyo/L=Tokyo/O=TestOrg/OU=Test/CN=ProxyCA" \
     -keyout /etc/squid/ssl_cert/myCA.key \
-    -out /etc/squid/ssl_cert/myCA.pem \
-    -subj "/C=JP/ST=Tokyo/L=Tokyo/O=CyberTest/OU=ProxyCA/CN=proxyca"
+    -out /etc/squid/ssl_cert/myCA.pem
 
-sudo chmod 400 /etc/squid/ssl_cert/myCA.key
-sudo chmod 444 /etc/squid/ssl_cert/myCA.pem
-
-# Configure Squid SSL Bump
+# Configure Squid
 log "Configuring Squid (initial)..."
-sudo cp /etc/squid/squid.conf /etc/squid/squid.conf.bak
-
 sudo tee /etc/squid/squid.conf <<EOF
 http_port 8080 ssl-bump cert=/etc/squid/ssl_cert/myCA.pem key=/etc/squid/ssl_cert/myCA.key generate-host-certificates=on dynamic_cert_mem_cache_size=4MB
-
 acl step1 at_step SslBump1
 ssl_bump peek step1
 ssl_bump bump all
-
-sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/lib/ssl_db -M 4MB
+sslcrtd_program /usr/libexec/squid/security_file_certgen -s /var/lib/ssl_db -M 4MB
 sslcrtd_children 5
 
-# Allow local subnet
+# Allow from local subnet
 acl localnet src 10.0.1.0/24
-
 http_access allow localnet
 http_access deny all
-
-cache deny all
 EOF
 
-# Initialize ssl_db
-sudo /usr/lib/squid/security_file_certgen -c -s /var/lib/ssl_db
+# Initialize SSL DB
+sudo /usr/libexec/squid/security_file_certgen -c -s /var/lib/ssl_db -M 4MB
 
-# Enable and restart Squid
+# Restart Squid
 log "Restarting squid..."
-sudo systemctl enable squid
 sudo systemctl restart squid
-sudo systemctl status squid --no-pager | tee -a $LOG_FILE
+sudo systemctl status squid | grep Active | tee -a $LOG_FILE
 
 # Convert scripts
 log "Converting scripts to LF format..."
 dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
 
-# Fix hosts entry
+# /etc/hosts に hostname 登録
 sudo sed -i "/^127.0.1.1/ d" /etc/hosts && echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
 
 log "Setup complete."
