@@ -45,16 +45,16 @@ Run-Step "Downloading and Installing Google Chrome" {
 }
 
 # ========== Install Wireshark ==========
-# Run-Step "Installing Wireshark" {
-   # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Run-Step "Installing Wireshark" {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-   # $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
-   # $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
+    $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
+    $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
 
-   # Start-BitsTransfer -Source $url -Destination $installerPath
-   # Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
-   # Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
-# }
+    Start-BitsTransfer -Source $url -Destination $installerPath
+    Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
+    Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
+}
 
 # ========== Install Japanese Language Pack ==========
 Run-Step "Installing Japanese language pack" {
@@ -131,6 +131,17 @@ Run-Step "Configuring internet proxy and WinHTTP proxy" {
 Run-Step "Forcing DNS server to 10.0.1.6" {
     Get-DnsClient | Where-Object {$_.InterfaceAlias -like "Ethernet*"} | ForEach-Object {
         Set-DnsClientServerAddress -InterfaceAlias $_.InterfaceAlias -ServerAddresses 10.0.1.6
+    }
+}
+
+# ========== デフォルトゲートウェイ 10.0.1.6 を追加 ==========
+Run-Step "Setting default gateway to 10.0.1.6" {
+    Get-NetAdapter | Where-Object {$_.Status -eq "Up"} | ForEach-Object {
+        $ifIndex = $_.ifIndex
+        # 既存 default route 削除
+        Remove-NetRoute -InterfaceIndex $ifIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue
+        # 新 default route 追加
+        New-NetRoute -InterfaceIndex $ifIndex -DestinationPrefix "0.0.0.0/0" -NextHop "10.0.1.6"
     }
 }
 
