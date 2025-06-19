@@ -1,4 +1,5 @@
 #!/bin/bash
+
 LOG_FILE="/home/troubleshoot/linux_server_setup.log"
 
 log() {
@@ -10,7 +11,7 @@ log "Starting setup..."
 # Install packages
 log "Installing required packages..."
 sudo apt-get update | tee -a $LOG_FILE
-sudo apt-get install -y dnsmasq squid mitmproxy dos2unix net-tools | tee -a $LOG_FILE
+sudo apt-get install -y dnsmasq squid openssl net-tools dos2unix | tee -a $LOG_FILE
 
 # Disable systemd-resolved to free port 53
 log "Disabling systemd-resolved..."
@@ -28,34 +29,56 @@ echo "log-facility=/var/log/dnsmasq.log" | sudo tee -a /etc/dnsmasq.d/logging.co
 # Restart dnsmasq
 log "Restarting dnsmasq..."
 sudo systemctl restart dnsmasq
-sudo systemctl status dnsmasq --no-pager | grep Active | tee -a $LOG_FILE
+sudo systemctl status dnsmasq --no-pager | tee -a $LOG_FILE
 
-# Configure squid
-log "Configuring squid..."
-sudo mkdir -p /etc/squid
-sudo touch /etc/squid/block_domains.acl
+# Generate Squid SSL CA cert
+log "Generating Squid SSL CA cert..."
+sudo mkdir -p /etc/squid/ssl_cert
+sudo openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+    -keyout /etc/squid/ssl_cert/myCA.key \
+    -out /etc/squid/ssl_cert/myCA.pem \
+    -subj "/C=JP/ST=Tokyo/L=Tokyo/O=CyberTest/OU=ProxyCA/CN=proxyca"
+
+sudo chmod 400 /etc/squid/ssl_cert/myCA.key
+sudo chmod 444 /etc/squid/ssl_cert/myCA.pem
+
+# Configure Squid SSL Bump
+log "Configuring Squid (initial)..."
+sudo cp /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
 sudo tee /etc/squid/squid.conf <<EOF
-http_port 8080
+http_port 8080 ssl-bump cert=/etc/squid/ssl_cert/myCA.pem key=/etc/squid/ssl_cert/myCA.key generate-host-certificates=on dynamic_cert_mem_cache_size=4MB
 
-acl blocked_domains dstdomain "/etc/squid/block_domains.acl"
-http_access deny blocked_domains
+acl step1 at_step SslBump1
+ssl_bump peek step1
+ssl_bump bump all
 
-http_access allow all
+sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/lib/ssl_db -M 4MB
+sslcrtd_children 5
 
-access_log /var/log/squid/access.log
-cache_log /var/log/squid/cache.log
+# Allow local subnet
+acl localnet src 10.0.1.0/24
+
+http_access allow localnet
+http_access deny all
+
+cache deny all
 EOF
 
-# Restart squid
+# Initialize ssl_db
+sudo /usr/lib/squid/security_file_certgen -c -s /var/lib/ssl_db
+
+# Enable and restart Squid
 log "Restarting squid..."
+sudo systemctl enable squid
 sudo systemctl restart squid
-sudo systemctl status squid --no-pager | grep Active | tee -a $LOG_FILE
+sudo systemctl status squid --no-pager | tee -a $LOG_FILE
 
 # Convert scripts
 log "Converting scripts to LF format..."
 dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
 
-# Hostname fix
+# Fix hosts entry
 sudo sed -i "/^127.0.1.1/ d" /etc/hosts && echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
 
 log "Setup complete."
