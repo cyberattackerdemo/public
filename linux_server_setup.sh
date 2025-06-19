@@ -6,68 +6,85 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') | $1" | tee -a $LOG_FILE
 }
 
-log "Starting setup..."
+log "===== Starting linux_server_setup.sh ====="
 
-# Install packages
-log "Installing required packages..."
-sudo apt-get update | tee -a $LOG_FILE
-sudo apt-get install -y dnsmasq squid-openssl dos2unix net-tools openssl | tee -a $LOG_FILE
+# Squid 6.10 Build & Install
+log "Downloading Squid 6.10..."
+wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz -O /tmp/squid-6.10.tar.gz | tee -a $LOG_FILE
 
-# Disable systemd-resolved to free port 53
-log "Disabling systemd-resolved..."
-sudo systemctl stop systemd-resolved
-sudo systemctl disable systemd-resolved
-sudo rm -f /etc/resolv.conf
-echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+log "Extracting Squid..."
+tar -xzf /tmp/squid-6.10.tar.gz -C /tmp | tee -a $LOG_FILE
 
-# Configure dnsmasq logging
-log "Configuring dnsmasq logging..."
-sudo mkdir -p /etc/dnsmasq.d
-echo "log-queries" | sudo tee /etc/dnsmasq.d/logging.conf
-echo "log-facility=/var/log/dnsmasq.log" | sudo tee -a /etc/dnsmasq.d/logging.conf
+log "Building Squid..."
+cd /tmp/squid-6.10 && ./configure --prefix=/usr/local/squid --with-openssl | tee -a $LOG_FILE
+make -j$(nproc) | tee -a $LOG_FILE
+make install | tee -a $LOG_FILE
 
-# Restart dnsmasq
-log "Restarting dnsmasq..."
-sudo systemctl restart dnsmasq
-sudo systemctl status dnsmasq | grep Active | tee -a $LOG_FILE
+# Create squid.service
+log "Creating squid.service..."
+cat <<EOF | sudo tee /etc/systemd/system/squid.service
+[Unit]
+Description=Squid Web Proxy Server (custom build)
+After=network.target
 
-# Generate Squid SSL CA cert
+[Service]
+Type=forking
+ExecStart=/usr/local/squid/sbin/squid -sY
+ExecReload=/usr/local/squid/sbin/squid -k reconfigure
+ExecStop=/usr/local/squid/sbin/squid -k shutdown
+PIDFile=/usr/local/squid/var/run/squid.pid
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+
+# Generate SSL CA cert
 log "Generating Squid SSL CA cert..."
-sudo mkdir -p /etc/squid/ssl_cert
-sudo openssl req -new -newkey rsa:4096 -sha256 -days 3650 -nodes -x509 \
-    -subj "/C=JP/ST=Tokyo/L=Tokyo/O=TestOrg/OU=Test/CN=ProxyCA" \
-    -keyout /etc/squid/ssl_cert/myCA.key \
-    -out /etc/squid/ssl_cert/myCA.pem
+mkdir -p /etc/squid/ssl_cert
+openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 -subj "/CN=ProxyCA" \
+    -keyout /etc/squid/ssl_cert/myCA.key -out /etc/squid/ssl_cert/myCA.pem | tee -a $LOG_FILE
 
-# Configure Squid
-log "Configuring Squid (initial)..."
-sudo tee /etc/squid/squid.conf <<EOF
+# Prepare SSL cert DB
+/usr/local/squid/libexec/security_file_certgen -c -s /var/lib/ssl_db -M 4MB | tee -a $LOG_FILE
+
+# Deploy squid.conf
+log "Configuring Squid..."
+cat <<EOF | sudo tee /usr/local/squid/etc/squid.conf
 http_port 8080 ssl-bump cert=/etc/squid/ssl_cert/myCA.pem key=/etc/squid/ssl_cert/myCA.key generate-host-certificates=on dynamic_cert_mem_cache_size=4MB
+
+sslcrtd_program /usr/local/squid/libexec/security_file_certgen -s /var/lib/ssl_db -M 4MB
+
 acl step1 at_step SslBump1
 ssl_bump peek step1
 ssl_bump bump all
-sslcrtd_program /usr/libexec/squid/security_file_certgen -s /var/lib/ssl_db -M 4MB
-sslcrtd_children 5
 
-# Allow from local subnet
-acl localnet src 10.0.1.0/24
-http_access allow localnet
-http_access deny all
+http_access allow all
 EOF
 
-# Initialize SSL DB
-sudo /usr/libexec/squid/security_file_certgen -c -s /var/lib/ssl_db -M 4MB
+# Enable & start Squid
+log "Enabling & starting Squid..."
+sudo systemctl enable squid
+sudo systemctl start squid
+sudo systemctl status squid --no-pager | tee -a $LOG_FILE
 
-# Restart Squid
-log "Restarting squid..."
-sudo systemctl restart squid
-sudo systemctl status squid | grep Active | tee -a $LOG_FILE
+# DNSMasq Setup
+log "Enabling & starting dnsmasq..."
+sudo systemctl enable dnsmasq
+sudo systemctl start dnsmasq
+sudo systemctl status dnsmasq --no-pager | tee -a $LOG_FILE
+
+# Download step1/step2/step3 scripts
+log "Downloading step scripts..."
+curl -L -o /home/troubleshoot/step1_block_dns.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step1_block_dns.sh
+curl -L -o /home/troubleshoot/step2_squid_ssl_bump.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step2_squid_ssl_bump.sh
+curl -L -o /home/troubleshoot/step3_restore_proxy.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step3_restore_proxy.sh
+chmod +x /home/troubleshoot/*.sh
 
 # Convert scripts
 log "Converting scripts to LF format..."
 dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
 
-# /etc/hosts に hostname 登録
-sudo sed -i "/^127.0.1.1/ d" /etc/hosts && echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
-
-log "Setup complete."
+log "===== Setup complete. ====="
