@@ -36,3 +36,8 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening ports:" | tee -a $LOG_FILE
 ss -lnpt | grep 8080 | tee -a $LOG_FILE
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== step3_restore_proxy.sh completed =====" | tee -a $LOG_FILE
+
+# Proxyキャプチャ
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Capturing proxy traffic (8080) with tcpdump for 300 sec..." | tee -a $LOG_FILE
+timeout 300 tcpdump -i any port 8080 -w /home/troubleshoot/step3_tcpdump_proxy.pcap
+echo "$(date '+%Y-%m-%d %H:%M:%S') | tcpdump proxy capture saved: /home/troubleshoot/step3_tcpdump_proxy.pcap" | tee -a $LOG_FILE
