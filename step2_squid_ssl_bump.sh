@@ -1,45 +1,17 @@
 #!/bin/bash
 
-LOG_FILE=phase2.log
+LOG_FILE=/home/troubleshoot/step2_squid_ssl_bump.log
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting step2_squid_ssl_bump.sh =====" | tee $LOG_FILE
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting phase2.sh =====" | tee $LOG_FILE
+# squid の cert をエラー cert に差し替える (例: proxy_error.crt/proxy_error.key)
+cp -f /usr/local/squid/etc/certs/proxy_error.crt /usr/local/squid/etc/certs/proxy.crt
+cp -f /usr/local/squid/etc/certs/proxy_error.key /usr/local/squid/etc/certs/proxy.key
 
-# Stop Squid
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Stopping Squid..." | tee -a $LOG_FILE
-pkill squid
-sleep 3
+# squid 起動
+/usr/local/squid/sbin/squid -s
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Checking if Squid is stopped (ps aux | grep squid)..." | tee -a $LOG_FILE
+# 確認
 ps aux | grep squid | grep -v grep | tee -a $LOG_FILE
+netstat -tulnp | grep 8080 | tee -a $LOG_FILE
 
-# Update squid.conf for step2
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Updating squid.conf for step2 ..." | tee -a $LOG_FILE
-
-cat << EOF > /usr/local/squid/etc/squid.conf
-# Squid Proxy - Step 2
-
-http_port 8080 ssl-bump cert=/usr/local/squid/etc/certs/proxy.crt key=/usr/local/squid/etc/certs/proxy.key
-
-acl step2 at_step SslBump2
-ssl_bump peek step2
-ssl_bump bump all
-
-sslcrtd_program /usr/local/squid/libexec/ssl_crtd -s /usr/local/squid/var/lib/ssl_db -M 4MB
-sslcrtd_children 5
-
-acl localnet src 10.0.0.0/8
-http_access allow localnet
-http_access deny all
-
-access_log stdio:/usr/local/squid/var/logs/access.log
-EOF
-
-# Start Squid
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting Squid with updated config..." | tee -a $LOG_FILE
-/usr/local/squid/sbin/squid
-
-sleep 3
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Checking if Squid is running (ps aux | grep squid)..." | tee -a $LOG_FILE
-ps aux | grep squid | grep -v grep | tee -a $LOG_FILE
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== phase2.sh completed =====" | tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== step2_squid_ssl_bump.sh completed =====" | tee -a $LOG_FILE
