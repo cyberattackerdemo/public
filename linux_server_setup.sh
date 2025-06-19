@@ -9,7 +9,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh ====="
 # 必要なパッケージをインストール
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Installing required packages..." | tee -a $LOG_FILE
 apt-get update >> $LOG_FILE 2>&1
-apt-get install -y build-essential libssl-dev libgnutls28-dev libnettle-dev pkg-config perl g++ wget libdb-dev openssl >> $LOG_FILE 2>&1
+apt-get install -y build-essential libssl-dev libgnutls28-dev nettle-dev pkg-config perl g++ wget libdb-dev >> $LOG_FILE 2>&1
 
 # Squid ダウンロードとビルド
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Downloading Squid 6.10..." | tee -a $LOG_FILE
