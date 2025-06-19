@@ -1,36 +1,28 @@
 #!/bin/bash
+LOG_FILE="/var/log/step2_mitmdump_cert_error.log"
 
-# step2_mitmproxy_cert_error.sh
-# Purpose: Switch proxy to mitmdump and generate cert error
-# Date: 2025-06-18
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting step2_mitmdump_cert_error.sh" | tee -a $LOG_FILE
 
-LOG_FILE="/var/log/mitmdump-switch.log"
+# Remove block dnsmasq config
+sudo rm -f /etc/dnsmasq.d/block_cybereason.conf
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting step2_mitmproxy_cert_error.sh" | sudo tee -a $LOG_FILE
+# Restart dnsmasq
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Restarting dnsmasq..." | tee -a $LOG_FILE
+sudo systemctl restart dnsmasq
+sudo systemctl status dnsmasq --no-pager | grep Active | tee -a $LOG_FILE
 
-# tinyproxy 停止
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Stopping tinyproxy..." | sudo tee -a $LOG_FILE
-sudo systemctl stop tinyproxy
-
-# tinyproxy 状態確認
-sudo systemctl status tinyproxy --no-pager | sudo tee -a $LOG_FILE
-
-# 少し待つ（port解放待ち）
-sleep 2
+# Restart squid
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Restarting squid..." | tee -a $LOG_FILE
+sudo systemctl restart squid
+sudo systemctl status squid --no-pager | grep Active | tee -a $LOG_FILE
 
 # mitmdump 起動 (バックグラウンド)
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Launching mitmdump on port 8080..." | sudo tee -a $LOG_FILE
-nohup mitmdump -p 8080 --ssl-insecure --mode regular -w /home/troubleshoot/mitmproxy.log > /dev/null 2>&1 &
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Launching mitmdump..." | tee -a $LOG_FILE
+nohup mitmdump -p 8080 --ssl-insecure --mode regular -w /home/troubleshoot/mitmdump.log > /dev/null 2>&1 &
 
-# 起動確認のため sleep
 sleep 3
 
 # mitmdump プロセス確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Current mitmdump process:" | sudo tee -a $LOG_FILE
-ps aux | grep mitmdump | grep -v grep | sudo tee -a $LOG_FILE
+ps aux | grep mitmdump | grep -v grep | tee -a $LOG_FILE
 
-# ポート確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening on port 8080:" | sudo tee -a $LOG_FILE
-sudo ss -tnlp | grep 8080 | sudo tee -a $LOG_FILE
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') | step2_mitmproxy_cert_error.sh completed." | sudo tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | step2_mitmdump_cert_error.sh completed." | tee -a $LOG_FILE
