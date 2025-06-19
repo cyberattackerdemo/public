@@ -1,26 +1,45 @@
 #!/bin/bash
 
-LOG_FILE="/var/log/step1_block_dns.log"
+LOG_FILE=phase1.log
 
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') | $1" | sudo tee -a $LOG_FILE
-}
-
-log "===== Starting step1_block_dns.sh ====="
-
-# dnsmasq block list
-sudo tee /etc/dnsmasq.d/blocklist.conf > /dev/null <<EOF
-address=/.cybereason.net/0.0.0.0
-EOF
-
-# Restart dnsmasq
-log "Restarting dnsmasq..."
-sudo systemctl restart dnsmasq
-sudo systemctl status dnsmasq --no-pager | sudo tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting phase1.sh =====" | tee $LOG_FILE
 
 # Stop Squid
-log "Stopping squid..."
-sudo systemctl stop squid
-sudo systemctl status squid --no-pager | sudo tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Stopping Squid..." | tee -a $LOG_FILE
+pkill squid
+sleep 3
 
-log "===== step1_block_dns.sh completed. ====="
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Checking if Squid is stopped (ps aux | grep squid)..." | tee -a $LOG_FILE
+ps aux | grep squid | grep -v grep | tee -a $LOG_FILE
+
+# Update squid.conf for step1
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Updating squid.conf for step1 ..." | tee -a $LOG_FILE
+
+cat << EOF > /usr/local/squid/etc/squid.conf
+# Squid Proxy - Step 1
+
+http_port 8080 ssl-bump cert=/usr/local/squid/etc/certs/proxy.crt key=/usr/local/squid/etc/certs/proxy.key
+
+acl step1 at_step SslBump1
+ssl_bump peek step1
+ssl_bump bump all
+
+sslcrtd_program /usr/local/squid/libexec/ssl_crtd -s /usr/local/squid/var/lib/ssl_db -M 4MB
+sslcrtd_children 5
+
+acl localnet src 10.0.0.0/8
+http_access allow localnet
+http_access deny all
+
+access_log stdio:/usr/local/squid/var/logs/access.log
+EOF
+
+# Start Squid
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting Squid with updated config..." | tee -a $LOG_FILE
+/usr/local/squid/sbin/squid
+
+sleep 3
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Checking if Squid is running (ps aux | grep squid)..." | tee -a $LOG_FILE
+ps aux | grep squid | grep -v grep | tee -a $LOG_FILE
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== phase1.sh completed =====" | tee -a $LOG_FILE
