@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # log file
-LOG_FILE=linux_server_setup.log
+LOG_FILE=/home/troubleshoot/linux_server_setup.log
 
 # 出力開始
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh =====" | tee $LOG_FILE
@@ -9,7 +9,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh ====="
 # 必要なパッケージをインストール
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Installing required packages..." | tee -a $LOG_FILE
 apt-get update >> $LOG_FILE 2>&1
-apt-get install -y build-essential libssl-dev libgnutls28-dev libnettle-dev pkg-config perl g++ wget libdb-dev >> $LOG_FILE 2>&1
+apt-get install -y build-essential libssl-dev libgnutls28-dev libnettle-dev pkg-config perl g++ wget libdb-dev openssl >> $LOG_FILE 2>&1
 
 # Squid ダウンロードとビルド
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Downloading Squid 6.10..." | tee -a $LOG_FILE
@@ -27,9 +27,13 @@ make install >> ../$LOG_FILE 2>&1
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Initializing ssl_crtd..." | tee -a ../$LOG_FILE
 /usr/local/squid/libexec/ssl_crtd -c -s /usr/local/squid/var/lib/ssl_db >> ../$LOG_FILE 2>&1
 
-# 証明書ディレクトリ作成
+# 証明書ディレクトリ作成 & 自己署名証明書作成
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating self-signed certificate..." | tee -a ../$LOG_FILE
 mkdir -p /usr/local/squid/etc/certs
-# ここは事前に証明書 (proxy.crt / proxy.key) を配置してください
+openssl req -new -newkey rsa:2048 -sha256 -days 365 -nodes -x509 \
+    -subj "/C=JP/ST=Tokyo/L=Minato-ku/O=MyCompany/CN=proxy.local" \
+    -keyout /usr/local/squid/etc/certs/proxy.key \
+    -out /usr/local/squid/etc/certs/proxy.crt >> ../$LOG_FILE 2>&1
 
 # squid.conf 作成
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Generating squid.conf ..." | tee -a ../$LOG_FILE
@@ -59,5 +63,4 @@ access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a ../$LOG_FILE
-
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a ../$LOG_FILE
