@@ -36,23 +36,6 @@ systemctl restart dnsmasq
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening DNS ports:" | tee -a $LOG_FILE
 ss -lnup | grep 53 | tee -a $LOG_FILE
 
-# ----- IP Forwarding / NAT(MASQUERADE) -----
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Enabling IP Forwarding & MASQUERADE..." | tee -a $LOG_FILE
-
-# IP Forwarding
-sysctl -w net.ipv4.ip_forward=1 >> $LOG_FILE 2>&1
-
-# NAT (MASQUERADE)
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE >> $LOG_FILE 2>&1
-
-# ip_forward 状態確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | IP forwarding status:" | tee -a $LOG_FILE
-sysctl net.ipv4.ip_forward | tee -a $LOG_FILE
-
-# iptables 状態確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | iptables NAT table:" | tee -a $LOG_FILE
-iptables -t nat -L -n -v | tee -a $LOG_FILE
-
 # ----- Squid Proxy ビルド -----
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Downloading Squid 6.10..." | tee -a $LOG_FILE
 cd /tmp
@@ -104,5 +87,16 @@ http_access deny all
 access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a ../$LOG_FILE
+# squid 起動
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Starting Squid proxy..." | tee -a ../$LOG_FILE
+/usr/local/squid/sbin/squid -z >> ../$LOG_FILE 2>&1
+/usr/local/squid/sbin/squid >> ../$LOG_FILE 2>&1
+
+# 確認
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid process status:" | tee -a ../$LOG_FILE
+ps aux | grep squid | grep -v grep | tee -a ../$LOG_FILE
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening ports:" | tee -a ../$LOG_FILE
+ss -lnpt | grep 8080 | tee -a ../$LOG_FILE
+
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a ../$LOG_FILE
