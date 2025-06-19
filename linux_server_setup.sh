@@ -1,90 +1,63 @@
 #!/bin/bash
 
-LOG_FILE="/home/troubleshoot/linux_server_setup.log"
+# log file
+LOG_FILE=linux_server_setup.log
 
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') | $1" | tee -a $LOG_FILE
-}
+# 出力開始
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh =====" | tee $LOG_FILE
 
-log "===== Starting linux_server_setup.sh ====="
+# 必要なパッケージをインストール
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Installing required packages..." | tee -a $LOG_FILE
+apt-get update >> $LOG_FILE 2>&1
+apt-get install -y build-essential libssl-dev libgnutls28-dev libnettle-dev pkg-config perl g++ wget libdb-dev >> $LOG_FILE 2>&1
 
-# Squid 6.10 Build & Install
-log "Downloading Squid 6.10..."
-wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz -O /tmp/squid-6.10.tar.gz | tee -a $LOG_FILE
+# Squid ダウンロードとビルド
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Downloading Squid 6.10..." | tee -a $LOG_FILE
+cd /tmp
+wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz >> $LOG_FILE 2>&1
+tar xzf squid-6.10.tar.gz
+cd squid-6.10
 
-log "Extracting Squid..."
-tar -xzf /tmp/squid-6.10.tar.gz -C /tmp | tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid..." | tee -a ../$LOG_FILE
+./configure --prefix=/usr/local/squid --with-gnutls --enable-ssl-crtd >> ../$LOG_FILE 2>&1
+make >> ../$LOG_FILE 2>&1
+make install >> ../$LOG_FILE 2>&1
 
-log "Building Squid..."
-cd /tmp/squid-6.10 && ./configure --prefix=/usr/local/squid --with-openssl | tee -a $LOG_FILE
-make -j$(nproc) | tee -a $LOG_FILE
-make install | tee -a $LOG_FILE
+# ssl_crtd 初期化
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Initializing ssl_crtd..." | tee -a ../$LOG_FILE
+/usr/local/squid/libexec/ssl_crtd -c -s /usr/local/squid/var/lib/ssl_db >> ../$LOG_FILE 2>&1
 
-# Create squid.service
-log "Creating squid.service..."
-cat <<EOF | sudo tee /etc/systemd/system/squid.service
-[Unit]
-Description=Squid Web Proxy Server (custom build)
-After=network.target
+# 証明書ディレクトリ作成
+mkdir -p /usr/local/squid/etc/certs
+# ここは事前に証明書 (proxy.crt / proxy.key) を配置してください
 
-[Service]
-Type=forking
-ExecStart=/usr/local/squid/sbin/squid -sY
-ExecReload=/usr/local/squid/sbin/squid -k reconfigure
-ExecStop=/usr/local/squid/sbin/squid -k shutdown
-PIDFile=/usr/local/squid/var/run/squid.pid
-LimitNOFILE=65535
+# squid.conf 作成
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Generating squid.conf ..." | tee -a ../$LOG_FILE
 
-[Install]
-WantedBy=multi-user.target
-EOF
+cat << EOF > /usr/local/squid/etc/squid.conf
+# Squid Proxy Configuration
 
-sudo systemctl daemon-reload
+# HTTP Proxy port
+http_port 8080 ssl-bump cert=/usr/local/squid/etc/certs/proxy.crt key=/usr/local/squid/etc/certs/proxy.key
 
-# Generate SSL CA cert
-log "Generating Squid SSL CA cert..."
-mkdir -p /etc/squid/ssl_cert
-openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 -subj "/CN=ProxyCA" \
-    -keyout /etc/squid/ssl_cert/myCA.key -out /etc/squid/ssl_cert/myCA.pem | tee -a $LOG_FILE
-
-# Prepare SSL cert DB
-/usr/local/squid/libexec/security_file_certgen -c -s /var/lib/ssl_db -M 4MB | tee -a $LOG_FILE
-
-# Deploy squid.conf
-log "Configuring Squid..."
-cat <<EOF | sudo tee /usr/local/squid/etc/squid.conf
-http_port 8080 ssl-bump cert=/etc/squid/ssl_cert/myCA.pem key=/etc/squid/ssl_cert/myCA.key generate-host-certificates=on dynamic_cert_mem_cache_size=4MB
-
-sslcrtd_program /usr/local/squid/libexec/security_file_certgen -s /var/lib/ssl_db -M 4MB
-
+# SSL Bump configuration
 acl step1 at_step SslBump1
 ssl_bump peek step1
 ssl_bump bump all
 
-http_access allow all
+# SSL Certificate Database
+sslcrtd_program /usr/local/squid/libexec/ssl_crtd -s /usr/local/squid/var/lib/ssl_db -M 4MB
+sslcrtd_children 5
+
+# ACL
+acl localnet src 10.0.0.0/8
+http_access allow localnet
+http_access deny all
+
+# Logging
+access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
-# Enable & start Squid
-log "Enabling & starting Squid..."
-sudo systemctl enable squid
-sudo systemctl start squid
-sudo systemctl status squid --no-pager | tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a ../$LOG_FILE
 
-# DNSMasq Setup
-log "Enabling & starting dnsmasq..."
-sudo systemctl enable dnsmasq
-sudo systemctl start dnsmasq
-sudo systemctl status dnsmasq --no-pager | tee -a $LOG_FILE
-
-# Download step1/step2/step3 scripts
-log "Downloading step scripts..."
-curl -L -o /home/troubleshoot/step1_block_dns.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step1_block_dns.sh
-curl -L -o /home/troubleshoot/step2_squid_ssl_bump.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step2_squid_ssl_bump.sh
-curl -L -o /home/troubleshoot/step3_restore_proxy.sh https://raw.githubusercontent.com/cyberattackerdemo/public/main/step3_restore_proxy.sh
-chmod +x /home/troubleshoot/*.sh
-
-# Convert scripts
-log "Converting scripts to LF format..."
-dos2unix /home/troubleshoot/*.sh | tee -a $LOG_FILE
-
-log "===== Setup complete. ====="
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a ../$LOG_FILE
