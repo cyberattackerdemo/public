@@ -25,6 +25,6 @@ ss -lnpt | grep 8080 | tee -a $LOG_FILE
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== step2_squid_ssl_bump.sh completed =====" | tee -a $LOG_FILE
 
 # 最後に tcpdump を自動キャプチャ (300秒)
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Capturing proxy traffic (8080) with tcpdump for 300 sec..." | tee -a $LOG_FILE
-timeout 300 tcpdump -i any port 8080 -w /home/troubleshoot/step2_tcpdump_proxy.pcap
-echo "$(date '+%Y-%m-%d %H:%M:%S') | tcpdump capture saved: /home/troubleshoot/step2_tcpdump_proxy.pcap" | tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Capturing proxy traffic (8080) and dns traffic (53) with tcpdump for 300 sec..." | tee -a $LOG_FILE
+timeout 300 tcpdump -i any "port 53 or port 8080" -w /home/troubleshoot/step2_tcpdump_dns_and_proxy.pcap
+echo "$(date '+%Y-%m-%d %H:%M:%S') | tcpdump capture saved: /home/troubleshoot/step2_tcpdump_proxy_and_dns.pcap" | tee -a $LOG_FILE
