@@ -76,17 +76,34 @@ Run-Step "Setting time zone to Tokyo" {
     Set-TimeZone -Id 'Tokyo Standard Time'
 }
 
-# ========== Pause Windows Update for 14 days ==========
-Run-Step "Pausing Windows Update for 14 days" {
-    $pauseDays = 14
-    $currentDate = Get-Date
-    $pauseUntil = $currentDate.AddDays($pauseDays).ToString("yyyy-MM-dd")
-    $regPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
-    if (-not (Test-Path $regPath)) {
-        New-Item -Path $regPath -Force | Out-Null
+# ========== Pause Windows Update for 14 days (modern method) ==========
+Run-Step "Pausing Windows Update for 14 days (WindowsUpdateProvider)" {
+    try {
+        Import-Module WindowsUpdateProvider -ErrorAction Stop
+        $pauseDays = 14
+        $pauseUntil = (Get-Date).AddDays($pauseDays)
+
+        Set-WUSettings -PauseQualityUpdates $true -QualityUpdatesPauseExpiryDate $pauseUntil -ErrorAction Stop
+
+        Write-Log "✅ Windows Update pause applied until $pauseUntil"
     }
-    Set-ItemProperty -Path $regPath -Name "PauseQualityUpdatesStartTime" -Value $currentDate
-    Set-ItemProperty -Path $regPath -Name "PauseQualityUpdatesUntil" -Value $pauseUntil
+    catch {
+        Write-Log "⚠️  Failed to pause Windows Update: $_" "ERROR"
+        Write-Log "Fallback to legacy registry method..."
+        
+        $currentDate = Get-Date
+        $pauseUntilStr = $currentDate.AddDays($pauseDays).ToString("yyyy-MM-dd")
+
+        $regPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
+        if (-not (Test-Path $regPath)) {
+            New-Item -Path $regPath -Force | Out-Null
+        }
+
+        Set-ItemProperty -Path $regPath -Name "PauseQualityUpdatesStartTime" -Value $currentDate
+        Set-ItemProperty -Path $regPath -Name "PauseQualityUpdatesUntil" -Value $pauseUntilStr
+
+        Write-Log "✅ Windows Update pause applied (legacy registry method) until $pauseUntilStr"
+    }
 }
 
 # ========== Set System Locale to Japanese ==========
