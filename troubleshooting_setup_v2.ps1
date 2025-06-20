@@ -7,7 +7,14 @@ function Write-Log {
     )
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $entry = "$timestamp [$level] $message"
-    Write-Host $entry
+
+    # 色分け表示
+    switch ($level) {
+        "INFO"  { Write-Host $entry -ForegroundColor White }
+        "ERROR" { Write-Host $entry -ForegroundColor Red }
+        default { Write-Host $entry -ForegroundColor White }
+    }
+
     Add-Content -Path $logPath -Value $entry
 }
 
@@ -22,7 +29,7 @@ function Run-Step {
         $output = & $action 2>&1
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
-        Write-Log "$stepName completed in $duration seconds."
+        Write-Log "$stepName completed in $duration seconds. ✅ SUCCESS"
         if ($output) {
             Write-Log "Output:`n$output"
         } else {
@@ -31,7 +38,7 @@ function Run-Step {
     } catch {
         $end = Get-Date
         $duration = ($end - $start).TotalSeconds
-        Write-Log "Failed: $stepName - $_ (after $duration seconds)" "ERROR"
+        Write-Log "Failed: $stepName - $_ (after $duration seconds) ❌ FAILED" "ERROR"
     }
 }
 
@@ -47,38 +54,21 @@ Run-Step "Downloading and Installing Google Chrome" {
 # ========== Install Wireshark ==========
 Run-Step "Installing Wireshark" {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
     $url = 'https://2.na.dl.wireshark.org/win64/Wireshark-4.4.7-x64.exe'
     $installerPath = 'C:\Users\Public\Wireshark-Installer.exe'
-
     Start-BitsTransfer -Source $url -Destination $installerPath
     Start-Process -FilePath $installerPath -ArgumentList "/S /quicklaunch=yes /desktopicon=yes" -Wait -ErrorAction Stop
     Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
 }
 
 # ========== Install Japanese Language Pack ==========
-Run-Step "Installing Japanese language pack" {
+Run-Step "Installing Japanese language pack and fonts" {
     Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0"
     Add-WindowsCapability -Online -Name "Language.Handwriting~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
     Add-WindowsCapability -Online -Name "Language.Speech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
     Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
     Add-WindowsCapability -Online -Name "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0"
-}
-
-# ========== Install Japanese Language Pack ========== 
-Run-Step "Installing Japanese language pack and fonts" { 
-    # 基本 Language Pack 
-    Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0" 
-    # 手書き 
-    Add-WindowsCapability -Online -Name "Language.Handwriting~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue 
-    # 音声入力 
-    Add-WindowsCapability -Online -Name "Language.Speech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue 
-    # Text-to-Speech 
-    Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue 
-    # IME 
-    Add-WindowsCapability -Online -Name "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0" 
-    # フォント (Fonts.Jpan) 
-    Add-WindowsCapability -Online -Name "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0" -ErrorAction Stop 
+    Add-WindowsCapability -Online -Name "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0" -ErrorAction Stop
 }
 
 # ========== Set Time Zone ==========
@@ -91,7 +81,6 @@ Run-Step "Pausing Windows Update for 14 days" {
     $pauseDays = 14
     $currentDate = Get-Date
     $pauseUntil = $currentDate.AddDays($pauseDays).ToString("yyyy-MM-dd")
-
     $regPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
     if (-not (Test-Path $regPath)) {
         New-Item -Path $regPath -Force | Out-Null
@@ -103,17 +92,14 @@ Run-Step "Pausing Windows Update for 14 days" {
 # ========== Set System Locale to Japanese ==========
 Run-Step "Configuring system locale to Japanese" {
     $langPack = Get-WindowsCapability -Online | Where-Object { $_.Name -like "Language.Basic~~~ja-JP~*" }
-
     if ($langPack.State -ne "Installed") {
         Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0" -ErrorAction Stop
     }
-
     $LangList = New-WinUserLanguageList ja-JP
     if ($LangList -and $LangList.Count -gt 0) {
         $LangList[0].Handwriting = $true
         Set-WinUserLanguageList $LangList -Force
     }
-
     Set-WinUILanguageOverride -Language ja-JP
     Set-WinSystemLocale ja-JP
     Set-Culture ja-JP
