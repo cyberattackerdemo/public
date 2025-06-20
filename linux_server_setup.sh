@@ -44,8 +44,8 @@ wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz >> $LOG_FILE 2>&1
 tar xzf squid-6.10.tar.gz
 cd squid-6.10
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid..." | tee -a $LOG_FILE
-./configure --prefix=/usr/local/squid --with-openssl --enable-ssl-crtd >> $LOG_FILE 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid (with Werror disabled)..." | tee -a $LOG_FILE
+CXXFLAGS="-Wno-error" ./configure --prefix=/usr/local/squid --with-openssl --enable-ssl-crtd >> $LOG_FILE 2>&1
 make >> $LOG_FILE 2>&1
 make install >> $LOG_FILE 2>&1
 
