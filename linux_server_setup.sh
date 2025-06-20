@@ -7,7 +7,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== Starting linux_server_setup.sh ====="
 # 必要なパッケージ
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Installing required packages..." | tee -a $LOG_FILE
 apt-get update >> $LOG_FILE 2>&1
-apt-get install -y build-essential libssl-dev libgnutls28-dev nettle-dev pkg-config perl g++ wget libdb-dev dnsmasq >> $LOG_FILE 2>&1
+apt-get install -y build-essential libssl-dev pkg-config perl g++ wget libdb-dev dnsmasq libxml2-dev libexpat1-dev >> $LOG_FILE 2>&1
 
 # ----- DNS Forwarding 環境セットアップ -----
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Configuring DNS forwarding..." | tee -a $LOG_FILE
@@ -44,26 +44,27 @@ wget http://www.squid-cache.org/Versions/v6/squid-6.10.tar.gz >> $LOG_FILE 2>&1
 tar xzf squid-6.10.tar.gz
 cd squid-6.10
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid..." | tee -a ../$LOG_FILE
-./configure --prefix=/usr/local/squid --with-gnutls --enable-ssl-crtd >> ../$LOG_FILE 2>&1
-make >> ../$LOG_FILE 2>&1
-make install >> ../$LOG_FILE 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid..." | tee -a $LOG_FILE
+./configure --prefix=/usr/local/squid --with-openssl --enable-ssl-crtd >> $LOG_FILE 2>&1
+make >> $LOG_FILE 2>&1
+make install >> $LOG_FILE 2>&1
 
-# ssl_crtd 初期化
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Initializing ssl_crtd..." | tee -a ../$LOG_FILE
-/usr/local/squid/libexec/ssl_crtd -c -s /usr/local/squid/var/lib/ssl_db >> ../$LOG_FILE 2>&1
+# ssl_db 初期化
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Initializing ssl_crtd..." | tee -a $LOG_FILE
+mkdir -p /usr/local/squid/var/lib/ssl_db
+chown nobody:nogroup /usr/local/squid/var/lib/ssl_db
+/usr/local/squid/libexec/ssl_crtd -c -s /usr/local/squid/var/lib/ssl_db >> $LOG_FILE 2>&1
 
 # 証明書ディレクトリ作成 & 自己署名証明書作成
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating self-signed certificate..." | tee -a ../$LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating self-signed certificate..." | tee -a $LOG_FILE
 mkdir -p /usr/local/squid/etc/certs
 openssl req -new -newkey rsa:2048 -sha256 -days 365 -nodes -x509 \
     -subj "/C=JP/ST=Tokyo/L=Minato-ku/O=MyCompany/CN=proxy.local" \
     -keyout /usr/local/squid/etc/certs/proxy.key \
-    -out /usr/local/squid/etc/certs/proxy.crt >> ../$LOG_FILE 2>&1
+    -out /usr/local/squid/etc/certs/proxy.crt >> $LOG_FILE 2>&1
 
 # squid.conf 作成
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Generating squid.conf ..." | tee -a ../$LOG_FILE
-
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Generating squid.conf ..." | tee -a $LOG_FILE
 cat << EOF > /usr/local/squid/etc/squid.conf
 # Squid Proxy Configuration
 
@@ -89,8 +90,7 @@ access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
 # ----- Squid systemd service 作成 -----
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating squid.service ..." | tee -a ../$LOG_FILE
-
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating squid.service ..." | tee -a $LOG_FILE
 cat << EOF > /etc/systemd/system/squid.service
 [Unit]
 Description=Squid Web Proxy
@@ -114,8 +114,8 @@ systemctl enable squid
 systemctl start squid
 
 # Squid 状態確認
-echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid status:" | tee -a ../$LOG_FILE
-systemctl status squid --no-pager | tee -a ../$LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid status:" | tee -a $LOG_FILE
+systemctl status squid --no-pager | tee -a $LOG_FILE
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a ../$LOG_FILE
-echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a ../$LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a $LOG_FILE
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a $LOG_FILE
