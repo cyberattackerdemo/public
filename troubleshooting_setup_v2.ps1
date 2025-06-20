@@ -96,23 +96,6 @@ Run-Step "Pausing Windows Update for 14 days (WindowsUpdateProvider)" {
     }
 }
 
-# ========== Set System Locale to Japanese ==========
-Run-Step "Configuring system locale to Japanese" {
-    $langPack = Get-WindowsCapability -Online | Where-Object { $_.Name -like "Language.Basic~~~ja-JP~*" }
-    if ($langPack.State -ne "Installed") {
-        Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0" -ErrorAction Stop
-    }
-    $LangList = New-WinUserLanguageList ja-JP
-    if ($LangList -and $LangList.Count -gt 0) {
-        $LangList[0].Handwriting = $true
-        Set-WinUserLanguageList $LangList -Force
-    }
-    Set-WinUILanguageOverride -Language ja-JP
-    Set-WinSystemLocale ja-JP
-    Set-Culture ja-JP
-    Set-WinHomeLocation -GeoId 122
-}
-
 # ========== Install Japanese Language Pack ==========
 Run-Step "Installing minimum Japanese language pack and fonts" {
     $capabilities = @(
@@ -130,6 +113,23 @@ Run-Step "Installing minimum Japanese language pack and fonts" {
             Write-Log "⚠️  Failed to install $cap - $_" "ERROR"
         }
     }
+}
+
+# ========== Set System Locale to Japanese ==========
+Run-Step "Configuring system locale to Japanese" {
+    $langPack = Get-WindowsCapability -Online | Where-Object { $_.Name -like "Language.Basic~~~ja-JP~*" }
+    if ($langPack.State -ne "Installed") {
+        Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0" -ErrorAction Stop
+    }
+    $LangList = New-WinUserLanguageList ja-JP
+    if ($LangList -and $LangList.Count -gt 0) {
+        $LangList[0].Handwriting = $true
+        Set-WinUserLanguageList $LangList -Force
+    }
+    Set-WinUILanguageOverride -Language ja-JP
+    Set-WinSystemLocale ja-JP
+    Set-Culture ja-JP
+    Set-WinHomeLocation -GeoId 122
 }
 
 # ========== Disable DNS-over-HTTPS in Chrome ==========
