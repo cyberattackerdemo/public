@@ -100,8 +100,7 @@ Run-Step "Pausing Windows Update for 14 days (WindowsUpdateProvider)" {
 Run-Step "Installing minimum Japanese language pack and fonts" {
     $capabilities = @(
         "Language.Basic~~~ja-JP~0.0.1.0",
-        "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0",
-        "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0"
+        "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0"
     )
 
     foreach ($cap in $capabilities) {
