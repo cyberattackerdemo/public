@@ -62,13 +62,22 @@ Run-Step "Installing Wireshark" {
 }
 
 # ========== Install Japanese Language Pack ==========
-Run-Step "Installing Japanese language pack and fonts" {
-    Add-WindowsCapability -Online -Name "Language.Basic~~~ja-JP~0.0.1.0"
-    Add-WindowsCapability -Online -Name "Language.Handwriting~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
-    Add-WindowsCapability -Online -Name "Language.Speech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
-    Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ja-JP~0.0.1.0" -ErrorAction SilentlyContinue
-    Add-WindowsCapability -Online -Name "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0"
-    Add-WindowsCapability -Online -Name "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0" -ErrorAction Stop
+Run-Step "Installing minimum Japanese language pack and fonts" {
+    $capabilities = @(
+        "Language.Basic~~~ja-JP~0.0.1.0",
+        "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0",
+        "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0"
+    )
+
+    foreach ($cap in $capabilities) {
+        Write-Log "Adding capability: $cap"
+        try {
+            Add-WindowsCapability -Online -Name $cap -ErrorAction Stop
+            Write-Log "✅ Successfully installed: $cap"
+        } catch {
+            Write-Log "⚠️  Failed to install $cap - $_" "ERROR"
+        }
+    }
 }
 
 # ========== Set Time Zone ==========
