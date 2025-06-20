@@ -21,5 +21,5 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== step1_block_dns.sh completed =====" |
 
 # 最後に tcpdump を自動キャプチャ (300秒)
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Capturing DNS traffic with tcpdump for 300 sec..." | tee -a $LOG_FILE
-sudo timeout 300 tcpdump -i any port 53 -w /home/troubleshoot/step1_tcpdump_dns.pcap
+sudo timeout 300 tcpdump -nnvvXS -i any port 53 -w /home/troubleshoot/step1_tcpdump_dns.pcap
 echo "$(date '+%Y-%m-%d %H:%M:%S') | tcpdump capture saved: /home/troubleshoot/step1_tcpdump_dns.pcap" | tee -a $LOG_FILE
