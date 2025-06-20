@@ -11,29 +11,20 @@ apt-get install -y build-essential libssl-dev pkg-config perl g++ wget libdb-dev
 
 # ----- DNS Forwarding 環境セットアップ -----
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Configuring DNS forwarding..." | tee -a $LOG_FILE
-
-# resolved.conf 更新
 sed -i 's/#DNS=/DNS=8.8.8.8/g' /etc/systemd/resolved.conf
 sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
-
-# resolv.conf 更新
 ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-
-# systemd-resolved restart
 systemctl restart systemd-resolved
 
-# dnsmasq 設定ファイル作成
 cat << EOF > /etc/dnsmasq.conf
 server=8.8.8.8
 server=8.8.4.4
 listen-address=127.0.0.1,10.0.1.6
 EOF
 
-# dnsmasq 再起動 & enable
 systemctl restart dnsmasq
 systemctl enable dnsmasq
 
-# DNS 状態確認
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Listening DNS ports:" | tee -a $LOG_FILE
 ss -lnup | grep 53 | tee -a $LOG_FILE
 
@@ -46,8 +37,13 @@ cd squid-6.10
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Building Squid..." | tee -a $LOG_FILE
 ./configure --prefix=/usr/local/squid --with-openssl --enable-ssl-crtd >> $LOG_FILE 2>&1
-make >> $LOG_FILE 2>&1
+make -j$(nproc) >> $LOG_FILE 2>&1
 make install >> $LOG_FILE 2>&1
+
+# ssl_crtd 存在確認
+if [ ! -x /usr/local/squid/libexec/ssl_crtd ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR: ssl_crtd not found!!" | tee -a $LOG_FILE
+fi
 
 # ssl_db 初期化
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Initializing ssl_crtd..." | tee -a $LOG_FILE
@@ -89,6 +85,13 @@ http_access deny all
 access_log stdio:/usr/local/squid/var/logs/access.log
 EOF
 
+# ----- squid 動作用ディレクトリ作成 & 権限補正 -----
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating squid runtime directories ..." | tee -a $LOG_FILE
+mkdir -p /usr/local/squid/var/run
+mkdir -p /usr/local/squid/var/logs
+chown -R nobody:nogroup /usr/local/squid/var/run
+chown -R nobody:nogroup /usr/local/squid/var/logs
+
 # ----- Squid systemd service 作成 -----
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Creating squid.service ..." | tee -a $LOG_FILE
 cat << EOF > /etc/systemd/system/squid.service
@@ -113,9 +116,17 @@ systemctl daemon-reload
 systemctl enable squid
 systemctl start squid
 
+# ----- /dev/shm cleanup -----
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Cleaning /dev/shm for squid ..." | tee -a $LOG_FILE
+rm -f /dev/shm/squid-*.shm
+
 # Squid 状態確認
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid status:" | tee -a $LOG_FILE
 systemctl status squid --no-pager | tee -a $LOG_FILE
+
+# Squid ポート確認
+echo "$(date '+%Y-%m-%d %H:%M:%S') | Squid Listening ports:" | tee -a $LOG_FILE
+ss -lnpt | grep 8080 | tee -a $LOG_FILE
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== squid.conf generated =====" | tee -a $LOG_FILE
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== linux_server_setup.sh completed =====" | tee -a $LOG_FILE
