@@ -97,22 +97,43 @@ Run-Step "Pausing Windows Update for 14 days (WindowsUpdateProvider)" {
 }
 
 # ========== Install Japanese Language Pack ==========
-Run-Step "Installing minimum Japanese language pack and fonts" {
+Run-Step "Installing minimum Japanese language pack and fonts with progress" {
     $capabilities = @(
         "Language.Basic~~~ja-JP~0.0.1.0",
         "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0"
     )
 
     foreach ($cap in $capabilities) {
-        Write-Log "Adding capability: $cap"
+        Write-Log "🚀 Starting install of: $cap"
+
         try {
-            Add-WindowsCapability -Online -Name $cap -ErrorAction Stop
-            Write-Log "✅ Successfully installed: $cap"
-        } catch {
+            $startTime = Get-Date
+
+            # 実行時に "In progress..." を表示
+            $installJob = Start-Job -ScriptBlock {
+                param($capName)
+                Add-WindowsCapability -Online -Name $capName -ErrorAction Stop
+            } -ArgumentList $cap
+
+            # 進捗表示ループ
+            while ($installJob.State -eq "Running") {
+                Write-Log "⌛ Installing: $cap (still in progress...)"
+                Start-Sleep -Seconds 15
+            }
+
+            # 完了状態確認
+            Receive-Job $installJob -ErrorAction Stop
+            $endTime = Get-Date
+            $duration = ($endTime - $startTime).TotalMinutes
+
+            Write-Log "✅ Successfully installed: $cap in $duration minutes"
+        }
+        catch {
             Write-Log "⚠️  Failed to install $cap - $_" "ERROR"
         }
     }
 }
+
 
 # ========== Set System Locale to Japanese ==========
 Run-Step "Configuring system locale to Japanese" {
