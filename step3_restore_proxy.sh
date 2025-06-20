@@ -39,5 +39,5 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') | ===== step3_restore_proxy.sh completed ====
 
 # Proxyキャプチャ
 echo "$(date '+%Y-%m-%d %H:%M:%S') | Capturing proxy traffic (8080) with tcpdump for 300 sec..." | tee -a $LOG_FILE
-sudo timeout 300 tcpdump -nnvvXS -i any port 8080 -w /home/troubleshoot/step3_tcpdump_proxy.pcap
+sudo timeout 300 tcpdump -i any port 8080 -w /home/troubleshoot/step3_tcpdump_proxy.pcap
 echo "$(date '+%Y-%m-%d %H:%M:%S') | tcpdump proxy capture saved: /home/troubleshoot/step3_tcpdump_proxy.pcap" | tee -a $LOG_FILE
