@@ -129,35 +129,10 @@ Run-Step "Disabling DNS-over-HTTPS in Chrome" {
     New-ItemProperty -Path $regPath -Name "DnsOverHttpsMode" -PropertyType String -Value "off" -Force | Out-Null
 }
 
-# ========== Configure Proxy ==========
-Run-Step "Configuring internet proxy and WinHTTP proxy" {
-    $proxyAddress = "10.0.1.6:8080"
-
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "http://$proxyAddress" /f
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
-
-    netsh winhttp set proxy proxy-server="http://$proxyAddress"
-
-    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "https://$proxyAddress", "Machine")
-    [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://$proxyAddress", "Machine")
-}
-
 # ========== DNS connection setting ==========
 Run-Step "Forcing DNS server to 10.0.1.7" {
     Get-DnsClient | Where-Object {$_.InterfaceAlias -like "Ethernet*"} | ForEach-Object {
         Set-DnsClientServerAddress -InterfaceAlias $_.InterfaceAlias -ServerAddresses 10.0.1.7
-    }
-}
-
-# ========== デフォルトゲートウェイ 10.0.1.7 を追加 ==========
-Run-Step "Setting default gateway to 10.0.1.7" {
-    Get-NetAdapter | Where-Object {$_.Status -eq "Up"} | ForEach-Object {
-        $ifIndex = $_.ifIndex
-        # 既存 default route 削除
-        Remove-NetRoute -InterfaceIndex $ifIndex -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue
-        # 新 default route 追加
-        New-NetRoute -InterfaceIndex $ifIndex -DestinationPrefix "0.0.0.0/0" -NextHop "10.0.1.7"
     }
 }
 
