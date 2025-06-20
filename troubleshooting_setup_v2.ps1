@@ -61,25 +61,6 @@ Run-Step "Installing Wireshark" {
     Remove-Item 'C:\Users\Public\Wireshark-Installer.exe'
 }
 
-# ========== Install Japanese Language Pack ==========
-Run-Step "Installing minimum Japanese language pack and fonts" {
-    $capabilities = @(
-        "Language.Basic~~~ja-JP~0.0.1.0",
-        "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0",
-        "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0"
-    )
-
-    foreach ($cap in $capabilities) {
-        Write-Log "Adding capability: $cap"
-        try {
-            Add-WindowsCapability -Online -Name $cap -ErrorAction Stop
-            Write-Log "✅ Successfully installed: $cap"
-        } catch {
-            Write-Log "⚠️  Failed to install $cap - $_" "ERROR"
-        }
-    }
-}
-
 # ========== Set Time Zone ==========
 Run-Step "Setting time zone to Tokyo" {
     Set-TimeZone -Id 'Tokyo Standard Time'
@@ -130,6 +111,25 @@ Run-Step "Configuring system locale to Japanese" {
     Set-WinSystemLocale ja-JP
     Set-Culture ja-JP
     Set-WinHomeLocation -GeoId 122
+}
+
+# ========== Install Japanese Language Pack ==========
+Run-Step "Installing minimum Japanese language pack and fonts" {
+    $capabilities = @(
+        "Language.Basic~~~ja-JP~0.0.1.0",
+        "InputMethod.Editor.Japanese~~~ja-JP~0.0.1.0",
+        "Language.Fonts.Jpan~~~und-JPAN~0.0.1.0"
+    )
+
+    foreach ($cap in $capabilities) {
+        Write-Log "Adding capability: $cap"
+        try {
+            Add-WindowsCapability -Online -Name $cap -ErrorAction Stop
+            Write-Log "✅ Successfully installed: $cap"
+        } catch {
+            Write-Log "⚠️  Failed to install $cap - $_" "ERROR"
+        }
+    }
 }
 
 # ========== Disable DNS-over-HTTPS in Chrome ==========
