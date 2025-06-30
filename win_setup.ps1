@@ -26,6 +26,18 @@ try {
     Set-MpPreference -DisableRealtimeMonitoring $true
 } catch { LogError "Defenderの無効化失敗: $($_.Exception.Message)" }
 
+# Defender Cloud-delivered protection 無効化
+try {
+    Log "DefenderのCloud-delivered protection (MAPS) を無効化"
+    Set-MpPreference -MAPSReporting Disabled
+} catch { LogError "Cloud-delivered protection無効化失敗: $($_.Exception.Message)" }
+
+# Defender Automatic Sample Submission 無効化
+try {
+    Log "DefenderのAutomatic Sample Submissionを無効化"
+    Set-MpPreference -SubmitSamplesConsent NeverSend
+} catch { LogError "Automatic Sample Submission無効化失敗: $($_.Exception.Message)" }
+
 # ファイアウォール無効化
 try {
     Log "ファイアウォールを無効化"
