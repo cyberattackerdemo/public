@@ -230,26 +230,6 @@ try {
     Add-WindowsCapability -Online -Name Language.TextToSpeech~~~ja-JP~0.0.1.0
 } catch { LogError "日本語言語パックインストール失敗: $($_.Exception.Message)" }
 
-# 一般ユーザーの作成
-#try {
-    #Log "一般ユーザー victim を作成"
-
-    #$userName = "victim"
-    #$password = "victim" | ConvertTo-SecureString -AsPlainText -Force
-
-    # 既に存在しないか確認してから作成
-    #if (!(Get-LocalUser -Name $userName -ErrorAction SilentlyContinue)) {
-        #New-LocalUser -Name $userName -Password $password -FullName "Victim User" -Description "Standard User"
-        #Add-LocalGroupMember -Group "Users" -Member $userName
-        #Add-LocalGroupMember -Group "Remote Desktop Users" -Member $userName
-        #Log "ユーザー victim を作成し、Users グループに追加完了"
-    #} else {
-        #Log "ユーザー victim は既に存在しています"
-    #}
-#} catch {
-    #LogError "一般ユーザー作成失敗: $($_.Exception.Message)"
-#}
-
 # 日本語に設定
 try {
     Log "言語設定を日本語に変更"
@@ -259,33 +239,6 @@ try {
     Set-Culture ja-JP
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
-
-# プロキシ設定とno_proxy環境変数に10.0.1.0/24を含める
-try {
-    Log "WinINET＋WinHTTP＋HKLMプロキシ＋no_proxy設定"
-
-    # WinINET (HKCU)
-    $regPathUser = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-    Set-ItemProperty -Path $regPathUser -Name AutoDetect -Value 0
-    Set-ItemProperty -Path $regPathUser -Name ProxyEnable -Value 1
-    Set-ItemProperty -Path $regPathUser -Name ProxyServer -Value "10.0.1.254:3128"
-
-    # WinINET (HKLMポリシー)
-    $regPathMachine = "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\Internet Settings"
-    if (!(Test-Path $regPathMachine)) { New-Item -Path $regPathMachine -Force | Out-Null }
-    New-ItemProperty -Path $regPathMachine -Name ProxyEnable -PropertyType DWord -Value 1 -Force | Out-Null
-    New-ItemProperty -Path $regPathMachine -Name ProxyServer -PropertyType String -Value "10.0.1.254:3128" -Force | Out-Null
-    New-ItemProperty -Path $regPathMachine -Name ProxyOverride -PropertyType String -Value "10.0.1.*" -Force | Out-Null
-
-    # WinHTTP
-    netsh winhttp set proxy 10.0.1.254:3128 "10.0.1.*"
-
-    # 環境変数 no_proxy
-    [System.Environment]::SetEnvironmentVariable("no_proxy", "10.0.1.*", "Machine")
-    [System.Environment]::SetEnvironmentVariable("NO_PROXY", "10.0.1.*", "Machine")
-
-    gpupdate /force | Out-Null
-} catch { LogError "プロキシ設定失敗: $($_.Exception.Message)" }
 
 # マクロ削除回避のための信頼センター設定とマクロセキュリティ緩和
 try {
