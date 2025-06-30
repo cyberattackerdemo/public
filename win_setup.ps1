@@ -1,20 +1,23 @@
-﻿$logFile = "C:\win_config_log.txt"
+$logFile = "C:\win_config_log.txt"
 
 # ログ出力関数（通常）
 function Log($message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $logFile -Value "$timestamp [INFO] $message"
+    $line = "$timestamp [INFO] $message"
+    Add-Content -Path $logFile -Value $line
+    Write-Output $line
 }
 
 # ログ出力関数（エラー）
 function LogError($message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $logFile -Value "$timestamp [ERROR] $message"
+    $line = "$timestamp [ERROR] $message"
+    Add-Content -Path $logFile -Value $line
+    Write-Output $line
 }
 
 # 実行のトランスクリプトを開始
 Start-Transcript -Path "C:\win_setup_transcript.txt" -Append
-
 Log "スクリプト実行開始"
 
 # Defender無効化
@@ -29,20 +32,16 @@ try {
     netsh advfirewall set allprofiles state off
 } catch { LogError "ファイアウォール無効化失敗: $($_.Exception.Message)" }
 
-# Office AMSI スキャンを無効化（Defenderによるマクロブロック回避）
+# Office AMSI スキャン無効化
 try {
     Log "Office AMSI スキャン無効化レジストリ設定（DisableOfficeAMSI=1）"
-
     $officeSecurityPath = "HKLM:\SOFTWARE\Microsoft\Office\16.0\Common\Security"
     if (!(Test-Path $officeSecurityPath)) {
         New-Item -Path $officeSecurityPath -Force | Out-Null
     }
     New-ItemProperty -Path $officeSecurityPath -Name "DisableOfficeAMSI" -PropertyType DWord -Value 1 -Force | Out-Null
-
     Log "Office AMSI スキャン無効化設定完了"
-} catch {
-    LogError "Office AMSI スキャン無効化設定失敗: $($_.Exception.Message)"
-}
+} catch { LogError "Office AMSI スキャン無効化設定失敗: $($_.Exception.Message)" }
 
 # UAC無効化
 try {
@@ -63,42 +62,40 @@ try {
     w32tm /resync | Out-Null
 } catch { LogError "NTP設定失敗: $($_.Exception.Message)" }
 
-# Wordインストール用ファイルをダウンロードして実行
+# Wordインストール用ファイルダウンロード & 実行
 try {
-    Log "Wordインストール用ファイルをGitHubからダウンロード"
+    Log "WordインストールファイルをGitHubからダウンロード"
     $tempPath = "C:\ODT"
-    if (!(Test-Path -Path $tempPath)) {
+    if (!(Test-Path $tempPath)) {
         New-Item -ItemType Directory -Path $tempPath | Out-Null
     }
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cyberattackerdemo/public/main/setup.exe" -OutFile "$tempPath\setup.exe"
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cyberattackerdemo/public/main/config.xml" -OutFile "$tempPath\config.xml"
-
     if (!(Test-Path "$tempPath\setup.exe") -or !(Test-Path "$tempPath\config.xml")) {
-        throw "必要なファイルが揃っていません。"
+        throw "必要なファイルが揃っていません"
     }
-
     Start-Process -FilePath "$tempPath\setup.exe" -ArgumentList "/configure $tempPath\config.xml" -Wait
 } catch { LogError "Wordインストール失敗: $($_.Exception.Message)" }
 
 # Chromeインストール
 try {
     Log "Chromeをダウンロード＆インストール"
-    Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\chrome_installer.exe'
-    Start-Process -FilePath 'C:\chrome_installer.exe' -ArgumentList '/silent /install /log C:\chrome_install_log.txt' -Wait
-    Remove-Item 'C:\chrome_installer.exe'
+    Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile "C:\chrome_installer.exe"
+    Start-Process -FilePath "C:\chrome_installer.exe" -ArgumentList "/silent /install /log C:\chrome_install_log.txt" -Wait
+    Remove-Item "C:\chrome_installer.exe" -Force
 } catch { LogError "Chromeインストール失敗: $($_.Exception.Message)" }
 
 # Chromeを既定ブラウザに
 try {
-    $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+    $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
     if (Test-Path $chromePath) {
-        Start-Process $chromePath -ArgumentList '--make-default-browser' -Wait
+        Start-Process $chromePath -ArgumentList "--make-default-browser" -Wait
     }
 } catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
 
-# Chromeショートカット作成とタスクバーへピン留め（プロキシ指定付き）
+# Chromeショートカット作成
 try {
-    Log "Chromeショートカット作成（プロキシオプション付き）"
+    Log "Chromeショートカット作成（プロキシ付き）"
     $desktopPath = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktopPath "Google Chrome.lnk"
     if (Test-Path $chromePath) {
@@ -108,7 +105,6 @@ try {
         $shortcut.Arguments = "--proxy-server=10.0.1.254:3128 --proxy-bypass-list=10.0.1.*"
         $shortcut.IconLocation = $chromePath
         $shortcut.Save()
-
         $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
         Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
     }
@@ -122,106 +118,73 @@ try {
     Set-Content -Path "$bookmarkPath\bookmarks.txt" -Value "https://gmail.com`r`nhttps://dp-handson-jp4.cybereason.net"
 } catch { LogError "ブックマーク作成失敗: $($_.Exception.Message)" }
 
+# GitHubファイルダウンロード用スクリプト作成 & タスク登録
 try {
-    # ログ出力ファイルのパス
-    $logFile = "C:\Users\Public\github_download_log.txt"
-
-    # 通常ログ出力関数
-    function Log($msg) {
-        $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $line = "$ts`t$msg"
-        Add-Content -Path $logFile -Value $line
-    }
-
-    # エラーログ出力関数
-    function LogError($msg) {
-        $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $line = "$ts`t[ERROR] $msg"
-        Add-Content -Path $logFile -Value $line
-    }
-
-    Log "GitHubファイルダウンロード用PS1とBATを作成・タスク登録（Public Desktop対応）"
-
+    Log "GitHubファイルダウンロード用PS1/BAT作成・タスク登録"
     $ps1Path = "C:\Users\Public\GitHubFileDownloader.ps1"
     $batPath = "C:\Users\Public\Desktop\github_downloader.bat"
-    $logPath = "C:\Users\Public\github_download_log.txt"
-    $desktopPath = "C:\Users\Public\Desktop"
+    $downloadLog = "C:\Users\Public\github_download_log.txt"
 
     $ps1Content = @'
 $logFile = "C:\Users\Public\github_download_log.txt"
-
 function Log($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $logFile -Value "$ts`t$msg"
+    $line = "$ts`t$msg"
+    Add-Content -Path $logFile -Value $line
+    Write-Output $line
 }
-
 function LogError($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $logFile -Value "$ts`t[ERROR] $msg"
+    $line = "$ts`t[ERROR] $msg"
+    Add-Content -Path $logFile -Value $line
+    Write-Output $line
 }
-
 Log "GitHubファイルダウンロード開始"
-
-$desktopPath = "C:\Users\Public\Desktop"
+$desktop = "C:\Users\Public\Desktop"
 $urls = @(
-    "https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
-    "https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
-    "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx",
-    "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx",
-    "https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
+"https://raw.githubusercontent.com/cyberattackerdemo/public/main/password.txt",
+"https://raw.githubusercontent.com/cyberattackerdemo/public/main/Customerlist.txt",
+"https://raw.githubusercontent.com/cyberattackerdemo/public/main/document1.docx",
+"https://raw.githubusercontent.com/cyberattackerdemo/public/main/document2.docx",
+"https://raw.githubusercontent.com/cyberattackerdemo/public/main/document3.docx"
 )
-
-Log "DEBUG: desktopPath=[$desktopPath] fileName=[$fileName]"
-
 foreach ($url in $urls) {
     $fileName = Split-Path $url -Leaf
-    $targetPath = Join-Path $desktopPath $fileName
-    if (-Not (Test-Path $targetPath)) {
+    $target = Join-Path $desktop $fileName
+    if (-not (Test-Path $target)) {
         try {
-            Invoke-WebRequest -Uri $url -OutFile $targetPath -ErrorAction Stop
+            Invoke-WebRequest -Uri $url -OutFile $target -ErrorAction Stop
             Log "Downloaded: $fileName"
         } catch {
-            LogError "Failed to download: $fileName - $($_.Exception.Message)"
+            LogError "Failed: $fileName - $($_.Exception.Message)"
         }
     } else {
         Log "Already exists: $fileName"
     }
 }
-
-$allExist = $true
+$all = $true
 foreach ($url in $urls) {
     $fileName = Split-Path $url -Leaf
-    if (-Not (Test-Path (Join-Path $desktopPath $fileName))) {
-        $allExist = $false
+    if (-not (Test-Path (Join-Path $desktop $fileName))) {
+        $all = $false
         break
     }
 }
-
-if ($allExist) {
-    Log "全ファイルダウンロード成功。自動削除を実行"
-    Remove-Item -Path 'C:\Users\Public\GitHubFileDownloader.ps1' -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path 'C:\Users\Public\Desktop\github_downloader.bat' -Force -ErrorAction SilentlyContinue
+if ($all) {
+    Log "全ファイルダウンロード完了・クリーンアップ"
+    Remove-Item -Path "C:\Users\Public\GitHubFileDownloader.ps1" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "C:\Users\Public\Desktop\github_downloader.bat" -Force -ErrorAction SilentlyContinue
     schtasks /Delete /TN "RunGitHubDownloader" /F | Out-Null
 }
 '@
 
-    # PS1ファイル保存
     Set-Content -Path $ps1Path -Value $ps1Content -Force
+    Set-Content -Path $batPath -Value "powershell -ExecutionPolicy Bypass -File `"$ps1Path`"" -Force
+    schtasks /Create /TN "RunGitHubDownloader" /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
+    Log "GitHubファイルダウンロードスクリプト登録完了"
+} catch { LogError "GitHubファイルダウンロードタスク設定失敗: $($_.Exception.Message)" }
 
-    # BATファイル作成（PowerShellスクリプト実行用）
-    $batContent = "powershell -ExecutionPolicy Bypass -File `"$ps1Path`""
-    Set-Content -Path $batPath -Value $batContent -Force
-
-    # タスクスケジューラ登録（初回ログオン時に管理者で実行）
-    schtasks /Create /TN "RunGitHubDownloader" `
-        /TR "$batPath" /SC ONLOGON /RL HIGHEST /F | Out-Null
-
-    Log "GitHubファイルダウンロードスクリプトとタスク登録を完了"
-} catch {
-    LogError "GitHubファイルダウンロード関連処理失敗: $($_.Exception.Message)"
-}
-
-# 日本語言語パックの追加
+# 日本語言語パック追加
 try {
     Log "日本語言語パックとIMEをインストール"
     Add-WindowsCapability -Online -Name Language.Basic~~~ja-JP~0.0.1.0
@@ -230,7 +193,7 @@ try {
     Add-WindowsCapability -Online -Name Language.TextToSpeech~~~ja-JP~0.0.1.0
 } catch { LogError "日本語言語パックインストール失敗: $($_.Exception.Message)" }
 
-# 日本語に設定
+# 日本語化設定
 try {
     Log "言語設定を日本語に変更"
     Set-WinUILanguageOverride -Language ja-JP
@@ -240,19 +203,17 @@ try {
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
 
-# マクロ削除回避のための信頼センター設定とマクロセキュリティ緩和
+# マクロ削除回避のための信頼センター設定
 try {
-    Log "信頼されていないマクロも有効化（警告なし）"
-    $macroSecurityPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security'
+    Log "信頼されていないマクロ有効化（警告なし）"
+    $macroSecurityPath = "HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Word\Security"
     if (!(Test-Path $macroSecurityPath)) {
         New-Item -Path $macroSecurityPath -Force | Out-Null
     }
-    Set-ItemProperty -Path $macroSecurityPath -Name 'VBAWarnings' -Value 1 -Force
-    Set-ItemProperty -Path $macroSecurityPath -Name 'blockcontentexecutionfrominternet' -Value 0 -Force
+    Set-ItemProperty -Path $macroSecurityPath -Name "VBAWarnings" -Value 1 -Force
+    Set-ItemProperty -Path $macroSecurityPath -Name "blockcontentexecutionfrominternet" -Value 0 -Force
     Log "マクロセキュリティ設定完了 (VBAWarnings=1, blockcontentexecutionfrominternet=0)"
-} catch {
-    LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)"
-}
+} catch { LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)" }
 
 # 一時フォルダ削除
 try {
