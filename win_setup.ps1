@@ -1,4 +1,4 @@
-$logFile = "C:\win_config_log.txt"
+﻿$logFile = "C:\win_config_log.txt"
 
 # ログ出力関数（通常）
 function Log($message) {
