@@ -7,22 +7,16 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "==== Start Custom Script Execution ===="
 
-echo "Allowing insecure repositories temporarily"
-echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99insecure
-echo 'APT::Get::AllowUnauthenticated "true";' >> /etc/apt/apt.conf.d/99insecure
-
 sleep 30
 
 apt-get clean
-apt-get update --allow-unauthenticated || true
-apt-get install -y curl gnupg --allow-unauthenticated || true
+apt-get update || true
+apt-get install -y curl gnupg wget || true
 
-# Add proper GPG keys to avoid insecure repos later
-curl -fsSL https://archive.kali.org/archive-key.asc | gpg --dearmor -o /usr/share/keyrings/kali-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list
+# 署名鍵をgpgでなく直接配置
+wget -qO /usr/share/keyrings/kali-archive-keyring.asc https://archive.kali.org/archive-key.asc
 
-# Clean insecure config
-rm -f /etc/apt/apt.conf.d/99insecure
+echo "deb [signed-by=/usr/share/keyrings/kali-archive-keyring.asc] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list
 
 apt-get clean
 rm -rf /var/lib/apt/lists/*
