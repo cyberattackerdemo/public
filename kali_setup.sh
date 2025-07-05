@@ -8,10 +8,10 @@ echo "==== Start Custom Script Execution ===="
 sleep 30
 
 echo "Updating sources.list to stable mirror"
-echo "deb http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list
+echo "deb [signed-by=/usr/share/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list
 
-echo "Fetching and adding Kali GPG key"
-wget -q -O /usr/share/keyrings/kali-archive-keyring.asc https://archive.kali.org/archive-key.asc
+echo "Fetching and adding Kali GPG key properly"
+wget -q -O - https://archive.kali.org/archive-key.asc | gpg --dearmor | tee /usr/share/keyrings/kali-archive-keyring.gpg > /dev/null
 
 echo "Updating package lists with retry and --fix-missing"
 RETRY_COUNT=0
