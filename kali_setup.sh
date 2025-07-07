@@ -31,9 +31,8 @@ systemctl enable postgresql || true
 systemctl start postgresql || true
 
 echo "Downloading test file"
-mkdir -p /home/kali/kali
-curl -L https://raw.githubusercontent.com/cyberattackerdemo/main/main/FakeRansom_JP.ps1 -o /home/kali/kali/FakeRansom_JP.ps1
-chown kali:kali /home/kali/kali/FakeRansom_JP.ps1
+curl -L https://raw.githubusercontent.com/cyberattackerdemo/main/main/FakeRansom_JP.ps1 -o /home/kali/FakeRansom_JP.ps1
+chown kali:kali /home/kali/FakeRansom_JP.ps1
 
 echo "Checking msfconsole"
 which msfconsole || echo "msfconsole not found"
