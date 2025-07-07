@@ -7,6 +7,10 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 echo "==== Start Custom Script Execution ===="
 sleep 30
 
+echo "Installing gnupg, wget, and curl for key retrieval"
+apt-get update || true
+apt-get install -y gnupg wget curl || true
+
 echo "Updating sources.list to stable mirror"
 echo "deb [signed-by=/usr/share/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware" > /etc/apt/sources.list
 
