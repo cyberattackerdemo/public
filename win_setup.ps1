@@ -105,23 +105,6 @@ try {
     }
 } catch { LogError "Chrome既定ブラウザ設定失敗: $($_.Exception.Message)" }
 
-# Chromeショートカット作成
-try {
-    Log "Chromeショートカット作成（プロキシ付き）"
-    $desktopPath = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktopPath "Google Chrome.lnk"
-    if (Test-Path $chromePath) {
-        $shell = New-Object -ComObject WScript.Shell
-        $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $chromePath
-        $shortcut.Arguments = "--proxy-server=10.0.1.254:3128 --proxy-bypass-list=10.0.1.*"
-        $shortcut.IconLocation = $chromePath
-        $shortcut.Save()
-        $taskbarShortcutPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Google Chrome.lnk"
-        Copy-Item -Path $shortcutPath -Destination $taskbarShortcutPath -Force
-    }
-} catch { LogError "Chromeショートカット作成失敗: $($_.Exception.Message)" }
-
 # ブックマーク作成
 try {
     Log "ブックマークファイル作成"
