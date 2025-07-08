@@ -1,4 +1,4 @@
-﻿$logFile = "C:\win_config_log.txt"
+$logFile = "C:\win_config_log.txt"
 
 # ログ出力関数（通常）
 function Log($message) {
@@ -20,34 +20,23 @@ function LogError($message) {
 Start-Transcript -Path "C:\win_setup_transcript.txt" -Append
 Log "スクリプト実行開始"
 
-# Defender無効化 (改善版)
+# Defender無効化
 try {
     Log "Defenderのリアルタイム保護を無効化"
     Set-MpPreference -DisableRealtimeMonitoring $true
-    Start-Sleep -Seconds 3
+} catch { LogError "Defenderの無効化失敗: $($_.Exception.Message)" }
 
-    $status = Get-MpComputerStatus
-    if ($status.RealTimeProtectionEnabled -eq $false) {
-        Log "リアルタイム保護が無効化されていることを確認"
-    } else {
-        LogError "リアルタイム保護が有効のままです（TPまたは管理ポリシーの可能性）"
-    }
-
+# Defender Cloud-delivered protection 無効化
+try {
     Log "DefenderのCloud-delivered protection (MAPS) を無効化"
     Set-MpPreference -MAPSReporting Disabled
+} catch { LogError "Cloud-delivered protection無効化失敗: $($_.Exception.Message)" }
 
+# Defender Automatic Sample Submission 無効化
+try {
     Log "DefenderのAutomatic Sample Submissionを無効化"
     Set-MpPreference -SubmitSamplesConsent NeverSend
-
-    Log "WinDefendサービスの停止を試行"
-    Stop-Service -Name WinDefend -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 3
-    if ((Get-Service -Name WinDefend).Status -eq 'Stopped') {
-        Log "WinDefendサービスが停止していることを確認"
-    } else {
-        LogError "WinDefendサービスの停止に失敗（TPまたは管理ポリシーの可能性）"
-    }
-} catch { LogError "Defender無効化処理でエラー: $($_.Exception.Message)" }
+} catch { LogError "Automatic Sample Submission無効化失敗: $($_.Exception.Message)" }
 
 # ファイアウォール無効化
 try {
@@ -55,16 +44,16 @@ try {
     netsh advfirewall set allprofiles state off
 } catch { LogError "ファイアウォール無効化失敗: $($_.Exception.Message)" }
 
-# Office AMSIスキャン無効化
+# Office AMSI スキャン無効化
 try {
-    Log "Office AMSIスキャン無効化設定"
+    Log "Office AMSI スキャン無効化レジストリ設定（DisableOfficeAMSI=1）"
     $officeSecurityPath = "HKLM:\SOFTWARE\Microsoft\Office\16.0\Common\Security"
     if (!(Test-Path $officeSecurityPath)) {
         New-Item -Path $officeSecurityPath -Force | Out-Null
     }
     New-ItemProperty -Path $officeSecurityPath -Name "DisableOfficeAMSI" -PropertyType DWord -Value 1 -Force | Out-Null
-    Log "Office AMSI スキャン無効化完了"
-} catch { LogError "Office AMSI スキャン無効化失敗: $($_.Exception.Message)" }
+    Log "Office AMSI スキャン無効化設定完了"
+} catch { LogError "Office AMSI スキャン無効化設定失敗: $($_.Exception.Message)" }
 
 # UAC無効化
 try {
