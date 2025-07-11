@@ -210,6 +210,29 @@ try {
     Log "マクロセキュリティ設定完了 (VBAWarnings=1, blockcontentexecutionfrominternet=0)"
 } catch { LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)" }
 
+# Outlook ショートカットをデスクトップに作成
+try {
+    Log "Outlookショートカットをデスクトップに作成"
+
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = Join-Path $desktopPath "Outlook.lnk"
+    $shell = New-Object -ComObject WScript.Shell
+
+    # Outlook の実行パスを自動検出
+    $outlookPath = Get-ChildItem "C:\Program Files*\Microsoft Office\root\Office*\OUTLOOK.EXE" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+    if ($outlookPath) {
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $outlookPath.FullName
+        $shortcut.IconLocation = $outlookPath.FullName
+        $shortcut.Save()
+        Log "Outlookショートカット作成完了: $($shortcutPath)"
+    } else {
+        LogError "Outlook 実行ファイルが見つかりませんでした"
+    }
+} catch { LogError "Outlookショートカット作成失敗: $($_.Exception.Message)" }
+
+
 # 一時フォルダ削除
 try {
     Log "一時フォルダ (C:\ODT) を削除"
