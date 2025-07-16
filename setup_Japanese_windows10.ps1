@@ -1,4 +1,4 @@
-﻿# ログ出力 (任意)
+# ログ出力 (任意)
 $logFile = "C:\win_langpack_setup.log"
 function Log($msg) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
