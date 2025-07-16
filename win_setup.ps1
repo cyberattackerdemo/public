@@ -232,6 +232,32 @@ try {
     }
 } catch { LogError "Outlookショートカット作成失敗: $($_.Exception.Message)" }
 
+try {
+    Log "次回セットアップ用スクリプトをGitHubからデスクトップにダウンロード"
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $setupScriptUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/setup_Japanese_windows10.ps1"
+    $setupScriptPath = Join-Path $desktop "setup_Japanese_windows10.ps1"
+
+    Invoke-WebRequest -Uri $setupScriptUrl -OutFile $setupScriptPath -UseBasicParsing
+    Log "セットアップスクリプトのダウンロード完了: $setupScriptPath"
+} catch {
+    LogError "セットアップスクリプトのダウンロード失敗: $($_.Exception.Message)"
+}
+
+try {
+    Log "セットアップ用BATファイルをデスクトップに作成"
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $batPath = Join-Path $desktop "Run_setup_Japanese_windows10.bat"
+    $ps1Path = Join-Path $desktop "setup_Japanese_windows10.ps1"
+
+    $batContent = "@echo off`r`npowershell -ExecutionPolicy Bypass -File `"$ps1Path`"`r`npause"
+    Set-Content -Path $batPath -Value $batContent -Encoding ASCII -Force
+
+    Log "BATファイル作成完了: $batPath"
+} catch {
+    LogError "BATファイル作成失敗: $($_.Exception.Message)"
+}
+
 
 # 一時フォルダ削除
 try {
