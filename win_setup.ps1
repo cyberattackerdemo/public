@@ -42,6 +42,7 @@ try {
 set setupScriptPath=C:\Users\Public\setup_Japanese_windows10.ps1
 powershell -ExecutionPolicy Bypass -File "%setupScriptPath%"
 pause
+del "%~f0"
 '@
 
     Set-Content -Path $batPath -Value $batContent -Encoding ASCII -Force
