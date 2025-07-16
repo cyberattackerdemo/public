@@ -35,11 +35,16 @@ try {
 
 try {
     Log "セットアップ用BATファイルをPublic\Desktopに作成"
-    $batPath = Join-Path $publicDesktop "Run_setup_Japanese_windows10.bat"
+    $batPath = "C:\Users\Public\Desktop\Run_setup_Japanese_windows10.bat"
 
-    $batContent = "@echo off`r`npowershell -ExecutionPolicy Bypass -File `"%setupScriptPath%`"`r`npause"
+    $batContent = @'
+@echo off
+set setupScriptPath=C:\Users\Public\setup_Japanese_windows10.ps1
+powershell -ExecutionPolicy Bypass -File "%setupScriptPath%"
+pause
+'@
+
     Set-Content -Path $batPath -Value $batContent -Encoding ASCII -Force
-
     Log "BATファイル作成完了: $batPath"
 } catch {
     LogError "BATファイル作成失敗: $($_.Exception.Message)"
