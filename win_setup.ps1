@@ -210,6 +210,7 @@ if ($all) {
     Log "GitHubファイルダウンロードスクリプト登録完了"
 } catch { LogError "GitHubファイルダウンロードタスク設定失敗: $($_.Exception.Message)" }
 
+<#
 # 日本語言語パック追加
 try {
     Log "日本語言語パックとIMEをインストール"
@@ -228,6 +229,7 @@ try {
     Set-Culture ja-JP
     Set-WinHomeLocation -GeoId 122
 } catch { LogError "言語設定失敗: $($_.Exception.Message)" }
+#>
 
 # マクロ削除回避のための信頼センター設定
 try {
