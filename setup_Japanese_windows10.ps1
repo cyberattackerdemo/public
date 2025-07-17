@@ -1,7 +1,7 @@
 ﻿# ログ出力用（BOM付き）
 function Log($msg) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    "$timestamp`t$msg" | Out-File -FilePath "C:\win_langpack_setup.log" -Encoding utf8BOM -Append
+    "$timestamp`t$msg" | Out-File -FilePath "C:\win_langpack_setup.log" -Encoding utf8 -Append
 }
 
 try {
