@@ -18,10 +18,16 @@ try {
     Set-Culture -CultureInfo "ja-JP"
     Set-WinHomeLocation -GeoId 122
 
+    Log "言語パックと基本設定適用完了"
+
+    Log "ユーザー言語リスト確認と追加"
     $LangList = Get-WinUserLanguageList
     if ($LangList.LanguageTag -notcontains "ja-JP") {
         $LangList.Add("ja-JP")
         Set-WinUserLanguageList $LangList -Force
+        Log "日本語をユーザー言語リストに追加"
+    } else {
+        Log "日本語はすでにユーザー言語リストに含まれています"
     }
 
     Log "言語設定完了"
