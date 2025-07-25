@@ -40,6 +40,8 @@ getsystem
 getuid
 
 #課題5
+※downloadコマンド内のxxはユーザー番号です。 例）ユーザー番号が01の場合→\handson-user-01\
+
 search -d C:\\Users -f *password*
 ---
 download 'C:\Users\handson-user-xx\Desktop\password.txt'
