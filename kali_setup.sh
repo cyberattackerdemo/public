@@ -35,8 +35,8 @@ curl -L https://raw.githubusercontent.com/cyberattackerdemo/main/main/FakeRansom
 chown kali:kali /home/kali/FakeRansom_JP.ps1
 
 echo "Downloading file from Blob (generic template)"
-BLOB_URL="https://xxx/yyy/file.bin"        # ←ここを差し替え（無害な検証用ファイル推奨）
-DEST_PATH="/home/kali/file.bin"            # ←保存ファイル名（任意）
+BLOB_URL="https://crjstorage.blob.core.windows.net/test-malwarefiles/qilin-sample.exe"  # ←ここを差し替え（無害な検証用ファイル推奨）
+DEST_PATH="/home/kali/qilin-sample.exe" # ←保存ファイル名（任意）
 
 # 保存先ディレクトリの確認
 install -d -m 0755 /home/kali
